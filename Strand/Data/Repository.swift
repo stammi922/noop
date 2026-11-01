@@ -210,6 +210,15 @@ final class Repository: ObservableObject {
     @Published private(set) var hydrationSeq = 0
     func noteHydrationChanged() { hydrationSeq += 1 }
 
+    /// Bumped when an NSDR session is logged. Today keys its load on this, because the day's Rest carries
+    /// the NSDR credit and a log never causes a `refreshSeq` data refresh. Also drops Today's day-scoped
+    /// snapshot so a re-mount cannot restore the pre-session Rest.
+    @Published private(set) var nsdrSeq = 0
+    func noteNSDRChanged() {
+        nsdrSeq += 1
+        todayDayScopedLoadedSeq = -1
+    }
+
     /// Bumped whenever a period-start row is logged or removed. Cycle surfaces use this lightweight
     /// signal to reload their sensitive local history without forcing a full strap-data refresh.
     @Published private(set) var cycleTrackingSeq = 0
