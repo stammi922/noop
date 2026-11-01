@@ -349,6 +349,55 @@ object CircadianEngine {
         return IdealSleepWindow(bedHour = wrap24(wake - durationHours), wakeHour = wake)
     }
 
+    /** Tonight's suggested fall-asleep and wake clock hours. Twin of the Swift tuple return. */
+    data class IdealTonight(val fallAsleepHour: Double, val wakeHour: Double)
+
+    /**
+     * Tonight's suggested wake and fall-asleep clock hours for someone who needs [needHours] of sleep.
+     *
+     * Same wake anchor as [idealSleepWindow] — `tempMinHour + cbtMinBeforeWakeHours` — but the bedtime is
+     * that wake minus the sleep NEED, not minus last night's length. The two answer different questions
+     * and must stay separate functions: the dial's ideal arc copies the actual night's duration so it
+     * compares PHASE alone, whereas "when should I sleep tonight" has to budget a full night, so it uses
+     * the same need the sleep-debt ledger measures against.
+     *
+     * null for a non-positive or impossible need, on the same reasoning as [idealSleepWindow].
+     * Mirrors the Swift twin exactly.
+     */
+    fun idealTonight(tempMinHour: Double, needHours: Double): IdealTonight? {
+        if (needHours <= 0.0 || needHours >= 24.0) return null
+        val wake = wrap24(tempMinHour + cbtMinBeforeWakeHours)
+        return IdealTonight(fallAsleepHour = wrap24(wake - needHours), wakeHour = wake)
+    }
+
+    /**
+     * Tonight's times for a phase estimate, or null when the fit cannot place them.
+     *
+     * UNREADABLE never gets times: its `tempMinHour` is a placeholder off a fit that failed the rhythm or
+     * day-count gate, and printing a clock time from it would state a precision the card's own "hard to
+     * read right now" message denies. WIDE does get them — unlike a NAMED chronotype, a suggested time is
+     * the same continuous phase reading the dial already draws. Mirrors the Swift twin exactly.
+     */
+    fun idealTonight(estimate: PhaseEstimate, needHours: Double): IdealTonight? {
+        if (estimate.confidence == PhaseConfidence.UNREADABLE) return null
+        return idealTonight(estimate.tempMinHour, needHours)
+    }
+
+    /**
+     * Format a clock hour as "HH:MM" (24 h) rounded to the nearest five minutes.
+     *
+     * Five minutes for the same reason the dial caption rounds: the phase is an activity fit, and a
+     * to-the-minute time would imply a precision it does not carry. Rounds on the whole-day minute count
+     * and wraps it, so 23:58 reads 00:00 and never 24:00. Locale-free for cross-platform string parity.
+     */
+    fun clockToFiveMinutes(hour: Double): String {
+        val fives = (wrap24(hour) * 60.0 / 5.0).roundToInt()
+        val minutes = (fives * 5) % (24 * 60)
+        val hp = (minutes / 60).toString().padStart(2, '0')
+        val mpad = (minutes % 60).toString().padStart(2, '0')
+        return "$hp:$mpad"
+    }
+
     /**
      * Signed hours the ACTUAL sleep window sits later (+) or earlier (−) than the chronotype-ideal one.
      *

@@ -260,6 +260,61 @@ final class CircadianEngineTests: XCTestCase {
         XCTAssertNotEqual(short?.bedHour, long?.bedHour)
     }
 
+    /// Tonight's times: wake = CBTmin + 2.5 h, fall asleep = wake − need. The 23:00 row wraps BOTH ends
+    /// across midnight. Same vectors as the Kotlin twin.
+    func testIdealTonight() {
+        let cases: [(Double, Double, (Double, Double)?)] = [
+            (4.5, 8.0, (23.0, 7.0)),
+            (2.0, 8.0, (20.5, 4.5)),
+            (23.0, 8.0, (17.5, 1.5)),
+            (4.5, 7.5, (23.5, 7.0)),
+            (4.5, 0.0, nil), (4.5, -1.0, nil), (4.5, 24.0, nil),
+        ]
+        for (tempMin, need, expected) in cases {
+            let t = CircadianEngine.idealTonight(tempMinHour: tempMin, needHours: need)
+            if let expected {
+                XCTAssertEqual(t?.fallAsleepHour ?? -1, expected.0, accuracy: 1e-12, "sleep for \(tempMin)/\(need)")
+                XCTAssertEqual(t?.wakeHour ?? -1, expected.1, accuracy: 1e-12, "wake for \(tempMin)/\(need)")
+            } else {
+                XCTAssertNil(t, "an impossible need has no bedtime: \(need)")
+            }
+        }
+    }
+
+    /// Tonight's wake shares the dial's ideal-arc wake anchor, but the bedtime budgets the NEED rather than
+    /// last night's length — `idealSleepWindow` must keep using the duration it is given.
+    func testIdealTonightUsesNeedWhileIdealWindowKeepsDuration() {
+        let tonight = CircadianEngine.idealTonight(tempMinHour: 4.5, needHours: 8)!
+        let window = CircadianEngine.idealSleepWindow(tempMinHour: 4.5, durationHours: 6)!
+        XCTAssertEqual(tonight.wakeHour, window.wakeHour)
+        XCTAssertEqual(window.bedHour, 1.0, accuracy: 1e-12)
+        XCTAssertEqual(tonight.fallAsleepHour, 23.0, accuracy: 1e-12)
+    }
+
+    /// An `.unreadable` fit never prints a time; `.wide` and `.solid` do.
+    func testIdealTonightIsWithheldForUnreadable() {
+        func est(_ c: CircadianEngine.PhaseConfidence) -> CircadianEngine.PhaseEstimate {
+            CircadianEngine.PhaseEstimate(tempMinHour: 4.5, acrophaseHours: 16.5, offsetVsScheduleMinutes: 0,
+                                          confidence: c, note: "")
+        }
+        XCTAssertNil(CircadianEngine.idealTonight(est(.unreadable), needHours: 8))
+        XCTAssertEqual(CircadianEngine.idealTonight(est(.wide), needHours: 8)?.wakeHour, 7.0)
+        XCTAssertEqual(CircadianEngine.idealTonight(est(.solid), needHours: 8)?.fallAsleepHour, 23.0)
+    }
+
+    /// Five-minute rounding, wrapping at midnight: 23:58 is 00:00, never 24:00. Same table as Kotlin.
+    func testClockToFiveMinutes() {
+        let cases: [(Double, String)] = [
+            (7.0, "07:00"), (23.0, "23:00"), (1.5, "01:30"), (17.5, "17:30"), (20.5, "20:30"),
+            (23.0 + 58.0 / 60.0, "00:00"), (23.0 + 57.0 / 60.0, "23:55"), (23.0 + 56.0 / 60.0, "23:55"),
+            (7.0 + 2.0 / 60.0, "07:00"), (7.0 + 3.0 / 60.0, "07:05"), (6.0 + 59.0 / 60.0, "07:00"),
+            (24.0, "00:00"), (-0.5, "23:30"), (0.0, "00:00"),
+        ]
+        for (hour, expected) in cases {
+            XCTAssertEqual(CircadianEngine.clockToFiveMinutes(hour), expected, "hour \(hour)")
+        }
+    }
+
     /// The dial's caption quantity. `wrap-late` earns its place: a 23:00 temperature minimum puts the
     /// ideal wake at 01:30, so waking at 02:30 is one hour LATE, not twenty-three hours early.
     func testSleepWindowOffsetHours() {
