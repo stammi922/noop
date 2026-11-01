@@ -10,8 +10,8 @@ import WhoopStore
 //
 // NOOP ships no audio. The recordings are © Scicomm Media LLC, so they are only ever streamed from
 // YouTube's official iframe player inside a WKWebView, and the screen offers "Open in YouTube" when the
-// player refuses to embed. Listened time comes from the player's own clock (`NSDRListenTracker`), so a
-// paused player or a seek earns nothing. The rest credit is `NSDRCredit`'s; this screen only reports it.
+// player refuses to embed or YouTube can't be reached. Played time comes from the player's own clock
+// (`NSDRListenTracker`), so a paused player or a seek earns nothing. The rest credit is `NSDRCredit`'s; this screen only reports it.
 
 /// Drives one NSDR screen: which recording is loaded, what the player reports, and the session clock.
 @MainActor
@@ -19,9 +19,15 @@ final class NSDRPlayerModel: ObservableObject {
     /// What the embedded player last reported.
     enum PlayerState: Equatable {
         case loading, ready, playing, paused, buffering, ended
-        /// A YouTube player error code (101/150 = embedding disabled, 152/153 = player configuration).
+        /// A YouTube player error code (101/150 = embedding disabled, 152/153 = player configuration), or
+        /// `unreachableCode` when the player never loaded at all.
         case failed(Int)
     }
+
+    /// Not a YouTube code: the iframe API never reported in (offline, or youtube.com blocked).
+    static let unreachableCode = -1
+    /// How long the page may stay silent (no `ready`, no `error`) before the player counts as unreachable.
+    static let loadTimeoutNanoseconds: UInt64 = 10_000_000_000
 
     /// A session that just ended, ready to be logged.
     struct FinishedSession {
@@ -45,8 +51,12 @@ final class NSDRPlayerModel: ObservableObject {
     private var sessionStart: Date?
     /// The length the player reports, which wins over the catalog's when it is known.
     private var playerDuration: Double?
+    private var loadWatchdog: Task<Void, Never>?
 
-    init() { recording = NSDRCatalog.randomPick() }
+    init() {
+        recording = NSDRCatalog.randomPick()
+        armLoadWatchdog()
+    }
 
     var nominalSeconds: Double {
         if let d = playerDuration, d > 0 { return d }
@@ -58,15 +68,20 @@ final class NSDRPlayerModel: ObservableObject {
         return false
     }
 
+    var isUnreachable: Bool { state == .failed(Self.unreachableCode) }
+
     /// One message from the page's script.
     func handle(_ body: [String: Any]) {
         let type = body["type"] as? String
         if let d = (body["duration"] as? NSNumber)?.doubleValue, d > 0 { playerDuration = d }
         switch type {
         case "ready":
-            if state == .loading { state = .ready }
+            // A slow network can bring the player up after the watchdog gave up on it; take it back.
+            if state == .loading || isUnreachable { state = .ready }
         case "error":
             state = .failed((body["code"] as? NSNumber)?.intValue ?? 0)
+        case "unreachable":
+            if state == .loading { state = .failed(Self.unreachableCode) }
         case "state", "tick":
             let code = (body["state"] as? NSNumber)?.intValue ?? -1
             let position = (body["position"] as? NSNumber)?.doubleValue ?? 0
@@ -78,7 +93,7 @@ final class NSDRPlayerModel: ObservableObject {
 
     /// YT.PlayerState: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued.
     private func observe(code: Int, position: Double) {
-        if case .failed = state { return }
+        if case .failed = state, !isUnreachable { return }
         let playing = code == 1
         if playing, sessionStart == nil { sessionStart = Date() }
         tracker.observe(position: position, isPlaying: playing)
@@ -120,6 +135,19 @@ final class NSDRPlayerModel: ObservableObject {
         state = .loading
         playerDuration = nil
         loadToken += 1
+        armLoadWatchdog()
+    }
+
+    /// A page that never reports in would otherwise sit as a black box forever. If this load is still
+    /// `.loading` after `loadTimeoutNanoseconds`, show the unreachable state (a newer load re-arms it).
+    private func armLoadWatchdog() {
+        loadWatchdog?.cancel()
+        let token = loadToken
+        loadWatchdog = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.loadTimeoutNanoseconds)
+            guard !Task.isCancelled, let self, self.loadToken == token, self.state == .loading else { return }
+            self.state = .failed(Self.unreachableCode)
+        }
     }
 }
 
@@ -230,10 +258,12 @@ struct NSDRView: View {
         ZStack {
             StrandPalette.surfaceInset
             VStack(spacing: 10) {
-                Image(systemName: "play.slash")
+                Image(systemName: player.isUnreachable ? "wifi.slash" : "play.slash")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(StrandPalette.textSecondary)
-                Text("YouTube won't play this recording here.")
+                Text(player.isUnreachable
+                     ? String(localized: "Can't reach YouTube. Check your connection and try again.")
+                     : String(localized: "YouTube won't play this recording here."))
                     .font(StrandFont.footnote)
                     .foregroundStyle(StrandPalette.textSecondary)
                     .multilineTextAlignment(.center)
@@ -241,7 +271,12 @@ struct NSDRView: View {
                     NoopButton("Open in YouTube", systemImage: "arrow.up.right.square", kind: .primary) {
                         openURL(player.recording.watchURL)
                     }
-                    NoopButton("Try another", kind: .secondary) { player.next() }
+                    // Offline, another recording fails the same way; retry this one instead.
+                    if player.isUnreachable {
+                        NoopButton("Try again", kind: .secondary) { player.reload(autoplay: false) }
+                    } else {
+                        NoopButton("Try another", kind: .secondary) { player.next() }
+                    }
                 }
             }
             .padding(12)
@@ -467,8 +502,9 @@ private struct NSDRYouTubePlayer: UIViewRepresentable {
         return URL(string: "https://\(id)") ?? URL(string: "https://app.noop")!
     }
 
-    /// The page: the iframe API, one player, and a once-a-second position tick while it exists. The
-    /// video id comes from `NSDRCatalog` (11 url-safe characters), never from user input.
+    /// The page: the iframe API, one player, and a once-a-second position tick while it exists. A script
+    /// that fails to load posts `unreachable` at once; one that hangs is caught by the model's watchdog.
+    /// The video id comes from `NSDRCatalog` (11 url-safe characters), never from user input.
     static func html(videoId: String, origin: String, autoplay: Bool) -> String {
         """
         <!DOCTYPE html>
@@ -499,7 +535,7 @@ private struct NSDRYouTubePlayer: UIViewRepresentable {
           }, 1000);
         }
         </script>
-        <script src="https://www.youtube.com/iframe_api"></script>
+        <script src="https://www.youtube.com/iframe_api" onerror="post({type:'unreachable'})"></script>
         </body></html>
         """
     }
