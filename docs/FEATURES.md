@@ -174,6 +174,31 @@ Technique list and timing hints are inspired by publicly documented ANS breath p
 NOOP is not affiliated with Ultrahuman. Education copy is original. Presence tempos were measured
 from public Presence Process guide audio.
 
+## NSDR (Non-Sleep Deep Rest)
+
+**iPhone: Today's + → "Perform and Log NSDR" · needs a network connection; no strap needed.**
+
+`StrandiOS/Screens/NSDRView.swift` plays a guided Huberman NSDR (about 10 minutes) through
+**YouTube's official embedded player**. NOOP ships and downloads no audio: the recordings are
+© Scicomm Media LLC and stay on YouTube. Each open picks a recording at random from the pool in
+`NSDRCatalog`; **Next** always switches to a different one. If YouTube refuses to embed a video,
+the screen offers **Open in YouTube** instead.
+
+- **Logged as a session** when it ends (End session, Next, the recording finishing, or leaving the
+  screen): start, end, the seconds actually listened (the player's own clock, so a pause or a seek
+  earns nothing) and the recording. Sessions under 30 seconds are not logged. Stored in the
+  `nsdrSession` table and listed under **Recent sessions**.
+- **A small, capped Rest credit** (`NSDRCredit`, one config): full credit (+2.0 Rest points) from
+  80% of the recording, nothing below 50%, a linear ramp in between; only the best two sessions of a
+  day count, capped at +4.0. Today's Rest shows the sleep composite plus that credit with a
+  `+2.0 NSDR` badge/caption. Two full sessions are worth less than one hour of sleep.
+- **Never sleep.** NSDR time never counts as sleep: total sleep, stages, sleep need, sleep debt, the
+  Sleep screen's sleep-performance figure and Charge's sleep input are unchanged. A day without NSDR
+  scores exactly as before.
+
+iOS only for now: Android has no NSDR player yet, so the table is `ios_only` in the schema oracle
+and the Swift declarations carry `platform_specific` parity dispositions.
+
 A "Test buzz" button fires a single pulse (bonded only).
 
 ---
