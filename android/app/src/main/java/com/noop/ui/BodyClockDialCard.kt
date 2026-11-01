@@ -56,14 +56,15 @@ import kotlin.math.sin
  * The dial card. [actualBedHour] / [actualWakeHour] are the night's own clock hours (0..<24, fractional),
  * taken from the scored session by the caller. [needHours] is the sleep need tonight's fall-asleep time
  * budgets — the SAME need the sleep-debt ledger measures against, so the two cards never disagree about
- * what a full night is. Twin of Apple `BodyClockDialCard`.
+ * what a full night is. null while that need is not known yet; the card then omits the Tonight line.
+ * Twin of Apple `BodyClockDialCard`.
  */
 @Composable
 fun BodyClockDialCard(
     estimate: CircadianEngine.PhaseEstimate,
     actualBedHour: Double,
     actualWakeHour: Double,
-    needHours: Double,
+    needHours: Double?,
 ) {
     // One hue for both arcs, told apart by dash and weight rather than by a second colour. Two blues
     // competed with the background image; a single legible one plus a dashed, lighter reference does not.
@@ -253,7 +254,7 @@ fun BodyClockDialCard(
                 Text(chronotypeText(c), style = NoopType.footnote, color = Palette.textTertiary)
             }
 
-            CircadianEngine.idealTonight(estimate, needHours)?.let { TonightLine(it) }
+            tonightFor(estimate, needHours)?.let { TonightLine(it) }
         }
     }
 }
@@ -293,6 +294,13 @@ private fun LegendItem(colour: androidx.compose.ui.graphics.Color, dashed: Boole
         Text(label, style = NoopType.footnote, color = Palette.textTertiary)
     }
 }
+
+/**
+ * What the Tonight line shows, or null for no line. A missing [needHours] means the personal need has not
+ * loaded yet; guessing one would print a bedtime that is wrong for anyone whose need is not the default.
+ */
+internal fun tonightFor(estimate: CircadianEngine.PhaseEstimate, needHours: Double?): CircadianEngine.IdealTonight? =
+    needHours?.let { CircadianEngine.idealTonight(estimate, it) }
 
 /**
  * The one place the card prints a clock time: when to wake and fall asleep tonight. Below the existing
