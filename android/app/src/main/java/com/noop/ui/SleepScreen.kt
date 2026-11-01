@@ -927,6 +927,11 @@ fun SleepScreen(
                                         estimate = phase,
                                         actualBedHour = localClockHour(session.effectiveStartTs),
                                         actualWakeHour = localClockHour(session.endTs),
+                                        // The ledger's own need (`debtNeedMin`), so tonight's bedtime and
+                                        // the sleep-debt card agree on what a full night is. The default
+                                        // only while the full-history model is still building.
+                                        needHours = tilesModel?.let { it.sleepDebtLedger.needMin / 60.0 }
+                                            ?: com.noop.analytics.RestScorer.defaultSleepNeedHours,
                                     )
                                 }
                             }

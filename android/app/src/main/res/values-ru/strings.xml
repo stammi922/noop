@@ -2551,6 +2551,8 @@
     <string name="l10n_body_clock_dial_card_body_clock_dial_03cdbc31">Циферблат биологических часов</string>
     <string name="l10n_body_clock_dial_card_last_night_6eaba4dd">Последняя ночь</string>
     <string name="l10n_body_clock_dial_card_your_clock_1b91f5ee">Ваши часы</string>
+    <string name="l10n_body_clock_dial_card_tonight_aim_for_e3575c2a">Сегодня ночью ориентируйтесь на</string>
+    <string name="l10n_body_clock_dial_card_wake_1_s_fall_asleep_2_889bc5ab">Подъём %1$s · Засыпание %2$s</string>
     <string name="vo2max_method_change_caption">Линия прерывается там, где метод оценки изменился или не был записан.</string>
     <string name="l10n_app_changelog_a_whoop_5_that_stays_connected_7b490eee">WHOOP 5, который остаётся на связи, ваши биологические часы на экране «Сон» и Журнал, отличающий «Нет» от пустоты</string>
     <string name="l10n_app_changelog_choose_a_12_hour_clock_sleep_8a19db5c">Выбор 12-часового формата, сон с браслетов без записи движения и журнал браслета, который перестал гадать</string>

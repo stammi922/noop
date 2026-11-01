@@ -2694,6 +2694,8 @@
     <string name="l10n_body_clock_dial_card_body_clock_dial_03cdbc31">Quadrante dell\'orologio biologico</string>
     <string name="l10n_body_clock_dial_card_last_night_6eaba4dd">La scorsa notte</string>
     <string name="l10n_body_clock_dial_card_your_clock_1b91f5ee">Il tuo orologio</string>
+    <string name="l10n_body_clock_dial_card_tonight_aim_for_e3575c2a">Stanotte, punta a</string>
+    <string name="l10n_body_clock_dial_card_wake_1_s_fall_asleep_2_889bc5ab">Sveglia %1$s · Addormentarsi %2$s</string>
     <string name="vo2max_method_change_caption">La linea si interrompe dove il metodo di stima è cambiato o non è stato registrato.</string>
     <string name="l10n_app_changelog_a_whoop_5_that_stays_connected_7b490eee">Una WHOOP 5 che resta connessa, il tuo orologio biologico nella schermata Sonno e un Diario che distingue un No dal nulla</string>
     <string name="l10n_app_changelog_choose_a_12_hour_clock_sleep_8a19db5c">Scegli l\'orologio a 12 ore, sonno dalle fasce che non memorizzano movimento e un registro della fascia che smette di tirare a indovinare</string>
