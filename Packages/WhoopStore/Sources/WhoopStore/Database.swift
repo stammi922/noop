@@ -1153,6 +1153,25 @@ extension WhoopStore {
                 t.primaryKey(["deviceId", "ts", "sequence"])
             }
         }
+        // The NSDR log: one row per finished guided NSDR session (start, end, the seconds actually
+        // listened, the recording's length, and which YouTube recording played). The rest credit is
+        // derived from these rows at read time (`NSDRCredit`), never stored, so the weights can change
+        // without a backfill. Additive: nothing existing is touched, so the rollback is to ignore the
+        // table. iOS/macOS only for now (schema_oracle.json records it as `ios_only`); NOT in the
+        // `.noopbak` settings whitelist, which carries settings, not rows.
+        migrator.registerMigration("v49-nsdr-session") { db in
+            try db.create(table: "nsdrSession", options: [.ifNotExists]) { t in
+                t.column("startTs", .integer).notNull()
+                t.column("endTs", .integer).notNull()
+                t.column("day", .text).notNull()
+                t.column("recordingId", .text).notNull()
+                t.column("listenedS", .double).notNull()
+                t.column("nominalS", .double).notNull()
+                t.primaryKey(["startTs"])
+            }
+            // No index: at most a few rows a day, read by day range; a scan is cheaper than the extra
+            // index surface.
+        }
         return migrator
     }
 }

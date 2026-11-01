@@ -349,6 +349,14 @@ struct TodayView: View {
     // "Rest" tile shows THIS, formatted like Charge/Effort, with hours-in-bed kept as the caption, the
     // tile previously showed hours where the score belonged (#248). nil until loaded / no night yet.
     @State private var restScore: Double?
+    /// The NSDR credit (Rest points) the selected day's Rest carries, 0 when none or when `restScore` is a
+    /// carried night (`nsdrCreditForDisplayedRest`). `restScore` itself stays the sleep composite, which the
+    /// Charge breakdown scores against; the ring and tile show `restDisplayed`.
+    @State private var restNSDRCredit: Double = 0
+    /// The Rest the ring and tile show: the sleep composite plus the day's NSDR credit.
+    private var restDisplayed: Double? {
+        AnalyticsEngine.Rest.withRestorativeCredit(restScore, creditPoints: restNSDRCredit)
+    }
 
     // The raw per-day merge winners remain available for watch-specific confidence behavior.
     @State private var provenanceByMetric: [String: String] = [:]
@@ -775,6 +783,14 @@ struct TodayView: View {
         guard isTodaySelected, let lastDay, let lastValue,
               !isCarryStale(priorDayKey: lastDay, todayKey: todayKey) else { return nil }
         return lastValue
+    }
+
+    /// The NSDR credit (Rest points) the displayed Rest may carry for the selected day: the day's own
+    /// credit when the Rest shown IS that day's own score, else 0, so a carried tail night never borrows
+    /// today's credit. The ONE resolver both Today variants use; the score itself is then
+    /// `AnalyticsEngine.Rest.withRestorativeCredit(rest, creditPoints: this)`.
+    static func nsdrCreditForDisplayedRest(isOwnDay: Bool, dayCredit: Double) -> Double {
+        isOwnDay ? dayCredit : 0
     }
 
     /// #1164/#2012 — should today's Rest be MARKED provisional? When the strap has banked records not yet
@@ -1561,7 +1577,7 @@ struct TodayView: View {
         // Reload when the data refreshes OR the selected day changes, the HR trend and Rest score are
         // day-scoped, so navigating must re-fetch them for the newly selected window.
         .task(id: TodayLoadKey(seq: repo.refreshSeq, offset: selectedDayOffset,
-                              dayCycleMode: dayCycleModeRaw)) { await loadAll() }
+                              dayCycleMode: dayCycleModeRaw, nsdrSeq: repo.nsdrSeq)) { await loadAll() }
         // #989: hydration writes don't bump refreshSeq, so the card needs its own triggers, a logged /
         // edited / deleted drink (hydrationSeq) and the Settings feature toggle both re-read just the two
         // hydration fields. Cheap (one metricSeries row), never re-runs the heavy loads.
@@ -3450,7 +3466,7 @@ struct TodayView: View {
         // #1164/#2012: when the strap has banked records not yet offloaded, today's Rest is provisional —
         // it may change once the full night lands and `analyzeRecent` re-scores it. That is now SAID, in
         // the column's caption, rather than shown by withholding the number. Past days are final.
-        if let s = restScore {
+        if let s = restDisplayed {
             GlowRing(fraction: s / 100, value: s, format: { "\(Int($0.rounded()))" },
                      color: StrandPalette.restColor, diameter: diameter, lineWidth: diameter * 0.10)
         } else if displayDay?.recovery != nil {
@@ -3978,15 +3994,15 @@ struct TodayView: View {
             // keeps its sleep-duration / efficiency caption.
             StatTile(
                 label: "Rest",
-                value: restScore.map { "\(Int($0.rounded()))%" } ?? "—",
+                value: restDisplayed.map { "\(Int($0.rounded()))%" } ?? "—",
                 // Component 2: a scored day shows its duration/efficiency caption; an unscored TODAY shows
                 // the "building" hint; a past day with no Rest falls to the honest "Needs the strap" rather
                 // than a bare blank, so the tile always carries a state.
                 caption: restIsPendingSync
                     ? String(localized: "Pending sync · strap history still offloading")
-                    : (restScore != nil ? restCaption(d)
+                    : (restScore != nil ? restCaptionWithNSDR(d)
                         : (buildingHint(.rest) ?? restCaption(d) ?? Self.needsStrapCaption)),
-                accent: restScore.map { StrandPalette.recoveryColor($0) } ?? StrandPalette.textPrimary,
+                accent: restDisplayed.map { StrandPalette.recoveryColor($0) } ?? StrandPalette.textPrimary,
                 // The Rest composite (0–100) trend, not raw sleep minutes, tracks the score above (#614).
                 sparkline: sparks["sleep_performance"],
                 sparkColor: StrandPalette.metricPurple,
@@ -4853,6 +4869,7 @@ struct TodayView: View {
     private func restoreDayScoped(_ c: TodayDayScopedCache) {
         sparks["sleep_performance"] = c.restSpark
         restScore = c.restScore
+        restNSDRCredit = c.restNSDRCredit
         provenanceByMetric = c.provenanceByMetric
         providerByMetric = c.providerByMetric
         hrPoints = c.hrPoints
@@ -4954,6 +4971,10 @@ struct TodayView: View {
             lastValue: restSeries.last?.value, isTodaySelected: selectedDayOffset == 0,
             todayKey: selectedDayKey)
         restScore = restScoreLocal
+        let restNSDRCreditLocal = Self.nsdrCreditForDisplayedRest(
+            isOwnDay: restByDay[selectedDayKey] != nil,
+            dayCredit: await repo.nsdrRestCredit(day: selectedDayKey))
+        restNSDRCredit = restNSDRCreditLocal
 
         // Resolve the displayed score row, then map computed rows through durable input provenance so the
         // badge names the sensor/import provider rather than the device that ran NOOP's math.
@@ -5109,6 +5130,7 @@ struct TodayView: View {
         repo.todayDayScopedCache = TodayDayScopedCache(
             restSpark: restSparkLocal,
             restScore: restScoreLocal,
+            restNSDRCredit: restNSDRCreditLocal,
             provenanceByMetric: provenance,
             providerByMetric: providers,
             hrPoints: hrPointsLocal,
@@ -5320,6 +5342,15 @@ struct TodayView: View {
         return d?.efficiency.map { String(format: String(localized: "%.0f%% eff"), locale: AppLanguage.activeLocale, $0) }
     }
 
+    /// `restCaption`, plus the NSDR credit when the shown Rest carries one, so the tile says why it reads
+    /// above the Sleep screen's sleep-performance figure for the same night.
+    private func restCaptionWithNSDR(_ d: DailyMetric?) -> String? {
+        guard restNSDRCredit > 0 else { return restCaption(d) }
+        // Sign, number and acronym only, so it reads the same in every language.
+        let credit = "+" + String(format: "%.1f", locale: AppLanguage.activeLocale, restNSDRCredit) + " NSDR"
+        return restCaption(d).map { "\($0) · \(credit)" } ?? credit
+    }
+
     /// Short "it's coming, not broken" caption for an unscored Effort/Rest tile on TODAY only. The
     /// call sites only reach here when the score is genuinely absent; this adds the today-only gate so
     /// a navigated PAST day with no score honestly stays a bare ", " (missing data, not mid-calibration).
@@ -5437,6 +5468,8 @@ private struct TodayLoadKey: Equatable {
     let seq: Int
     let offset: Int
     let dayCycleMode: String
+    /// A logged NSDR session moves the day's Rest without a data refresh.
+    let nsdrSeq: Int
 }
 
 /// #849: an in-memory snapshot of everything `loadHistoryWide()` computes: the ~40 history-wide reads +
@@ -5474,6 +5507,7 @@ struct TodayHistoryWideCache {
 struct TodayDayScopedCache {
     let restSpark: [Double]
     let restScore: Double?
+    let restNSDRCredit: Double
     let provenanceByMetric: [String: String]
     let providerByMetric: [String: ScoreInputProvider]
     let hrPoints: [TrendPoint]

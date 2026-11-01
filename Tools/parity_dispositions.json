@@ -436,6 +436,190 @@
       "identity_sha256": "6aa52285ae46cf0ae75a690feee01765f9401825b6c9845c146163fdf5b2bb3e",
       "platform": "swift",
       "rationale": "A LOCAL binding inside the private v16 ECG decoder (#2847), not a static constant. The ledger's Swift rule treats any four-space `let` in a file-scope function as a candidate `static let`, which is how it finds file-scope constants without parsing, so a local in a top-level `private func` lands in the inventory. The Kotlin twin's equivalent is a local `val` in its own decodeWhoop5HistoricalV16, which the Kotlin rule never inventories because it matches `const val` only, and a Set-valued or object-valued local cannot be `const` in Kotlin at all. There is nothing to pair and nothing to change in either decoder."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCatalog.swift::recordingById/1#1",
+      "identity_sha256": "b7ef6c53b070828e7bfabbf1a777e780d6b7155dad9d787af456a2a07ee50532",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCatalog.swift::randomPick/2#1",
+      "identity_sha256": "4df7168ae88bd12cfdb6067e1f454f647da30479b431532ef87839f00dbe4ef3",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCatalog.swift::observe/2#1",
+      "identity_sha256": "1303092252b0d15e1b9a5fe3b5ed839062dbdb1632c50298de15f7bec6ffe84c",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::sessionFraction/1#1",
+      "identity_sha256": "20853cee17e16c34f6dcc3f4a7774ff35376bd7165ad6b41d30d60282b30ba5d",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::sessionPoints/1#1",
+      "identity_sha256": "be0a9ad7e55943f082531d7bb2ee70d818ed66ad5e0bda2bc3307c7c8550bc7b",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::dailyPoints/1#1",
+      "identity_sha256": "99f4e13a222dd0a31cb48ef0e10ff6de74743c013d9df3ff9bf998f011dac75f",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::round2/1#1",
+      "identity_sha256": "5b0c6947dcc157ce632b862b44a9c063efe394347c3f0a96fd25bebe4a5d2b08",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::withRestorativeCredit/2#1",
+      "identity_sha256": "452f31eeb3352ec81e669aef6140ffe8feaad528e821031c21918386c0b01d3a",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/WhoopStore/Sources/WhoopStore/NSDRSessionStore.swift::decode/1#1",
+      "identity_sha256": "0552dbfcf45dc4c6cc91181ac6dae2851ce943245de9b80c8066e0cc1105cc93",
+      "platform": "swift",
+      "rationale": "Reads/writes the ios_only `nsdrSession` table (GRDB v49, recorded as ios_only in schema_oracle.json). Android has no NSDR player and no Room table to pair with; a Room DAO twin lands with an Android NSDR player."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/WhoopStore/Sources/WhoopStore/NSDRSessionStore.swift::upsertNSDRSession/1#1",
+      "identity_sha256": "4436d61c32a1e9a5bac106562ba079595ef8ab14d863ee8c866f99b128976e18",
+      "platform": "swift",
+      "rationale": "Reads/writes the ios_only `nsdrSession` table (GRDB v49, recorded as ios_only in schema_oracle.json). Android has no NSDR player and no Room table to pair with; a Room DAO twin lands with an Android NSDR player."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/WhoopStore/Sources/WhoopStore/NSDRSessionStore.swift::nsdrSessions/2#1",
+      "identity_sha256": "16291784b34f27fc0d998f082c810b970a70c39afeba57858be6fdd3ea3e4519",
+      "platform": "swift",
+      "rationale": "Reads/writes the ios_only `nsdrSession` table (GRDB v49, recorded as ios_only in schema_oracle.json). Android has no NSDR player and no Room table to pair with; a Room DAO twin lands with an Android NSDR player."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-function",
+      "identity": "swift\u0000Packages/WhoopStore/Sources/WhoopStore/NSDRSessionStore.swift::recentNSDRSessions/1#1",
+      "identity_sha256": "b9d629a5f1ddeebf47ed41971274b25b454987f4a9ab989889bcc74b6ff48c3e",
+      "platform": "swift",
+      "rationale": "Reads/writes the ios_only `nsdrSession` table (GRDB v49, recorded as ios_only in schema_oracle.json). Android has no NSDR player and no Room table to pair with; a Room DAO twin lands with an Android NSDR player."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCatalog.swift::all",
+      "identity_sha256": "ffb93120490fc2a31ce48aee0e06ae8862889a4ae820e3d1e8e8e8fa921eafac",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCatalog.swift::maxStepSeconds",
+      "identity_sha256": "b81fb88ae5df6fd024a4c72bf781d8b5faa3f198a7e1c73538acd6a7f9b8a629",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::dailyCapPoints",
+      "identity_sha256": "765bccf359ba674e01fa1a0be58bc364196ce0517942398bc7a4ce162faa1b9d",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::fullCreditFraction",
+      "identity_sha256": "d57d037e5063c0fe137588327afc769d905cd0d056cea59c6c8253db31f89489",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::maxSessionsPerDay",
+      "identity_sha256": "983e7423adc168a50745d12ab1a2f04539c4655c0f32dfd812a288a5acde99a7",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::perSessionPoints",
+      "identity_sha256": "5dbbd9d69bc651367aa048d6cdd618ad0bdbf160177888fa4cbcff64ece3dac9",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-constant",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift::zeroCreditBelowFraction",
+      "identity_sha256": "a01bf1e714cf784c685f8893db567238fabe5e4f99b73315de368f67c3ded829",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-file",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCatalog.swift",
+      "identity_sha256": "0da552cf6eabde21e63b590de144c25f750323e12f4abee29de36113d6f0ac78",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-file",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCredit.swift",
+      "identity_sha256": "3a37cd71ee5d032ddefd92970652c598cf030fe3354b1a8c3d7ea88a40858c73",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-file",
+      "identity": "swift\u0000Packages/WhoopStore/Sources/WhoopStore/NSDRSessionStore.swift",
+      "identity_sha256": "f22d8771d1adcd5e01f17357cc14ca4e691c40adc99f94622e7419e99022b6ad",
+      "platform": "swift",
+      "rationale": "Reads/writes the ios_only `nsdrSession` table (GRDB v49, recorded as ios_only in schema_oracle.json). Android has no NSDR player and no Room table to pair with; a Room DAO twin lands with an Android NSDR player."
+    },
+    {
+      "type": "platform_specific",
+      "kind": "add-unpaired-property",
+      "identity": "swift\u0000Packages/StrandAnalytics/Sources/StrandAnalytics/NSDRCatalog.swift::watchURL@property#1",
+      "identity_sha256": "c786a058975a0bff5f5b6c2d2e5fb97ea0c37ccef458d3df5fe75f2cf0aded15",
+      "platform": "swift",
+      "rationale": "The NSDR session (\"Perform and Log NSDR\") is an iOS-only feature in this PR: the embedded YouTube player, the session log and the Today Rest credit exist only in the Apple app, so nothing on Android logs an NSDR session or would call this. The Kotlin twin lands with an Android NSDR player, tracked as a follow-up."
     }
   ]
 }

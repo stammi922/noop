@@ -52,7 +52,8 @@ struct LiquidTodayView: View {
     @State private var hydrationGoalML: Int?
 
     // async-loaded via the confirmed Repository accessors
-    @State private var restScore: Double?          // sleep_performance, day-keyed
+    @State private var restScore: Double?          // sleep_performance + the day's NSDR credit, day-keyed
+    @State private var restNSDRCredit: Double = 0  // the NSDR share of `restScore` (Rest points)
     /// Input providers for the three scores, keyed by recovery / strain / sleep_performance.
     @State private var heroProviderByMetric: [String: ScoreInputProvider] = [:]
     @State private var stress: Double?             // StressModel(...).score, 0–3
@@ -464,7 +465,7 @@ struct LiquidTodayView: View {
         .liquidMediumHaptic(trigger: pullHaptic)
         // hydrationSeq joins the id so logging a drink re-reads the card immediately, the same trigger set
         // classic TodayView's reloadHydration() uses.
-        .task(id: "\(repo.refreshSeq)-\(selectedDayOffset)-\(repo.hydrationSeq)-\(hydrationEnabled)-\(dayCycleModeRaw)") {
+        .task(id: "\(repo.refreshSeq)-\(selectedDayOffset)-\(repo.hydrationSeq)-\(hydrationEnabled)-\(dayCycleModeRaw)-\(repo.nsdrSeq)") {
             DashboardCardPrefs.migrateLegacyStepsAverage()
             await load()
         }
@@ -728,6 +729,18 @@ struct LiquidTodayView: View {
                             .offset(y: -(NoopMetrics.space4 + NoopMetrics.sourceBadgeHeight / 2))
                             .allowsHitTesting(false)
                             .accessibilityLabel(Text("Source: \(sourceLabel)"))
+                    }
+                }
+                // The NSDR share of the Rest above, so the hero says why it reads higher than the Sleep
+                // screen's sleep-performance figure for the same night.
+                .overlay(alignment: .bottom) {
+                    if restNSDRCredit > 0 {
+                        // Sign, number and acronym only, so it reads the same in every language.
+                        let badge = "+" + String(format: "%.1f", locale: AppLanguage.activeLocale, restNSDRCredit) + " NSDR"
+                        SourceBadge("\(badge)", tint: StrandPalette.restColor)
+                            .fixedSize()
+                            .offset(y: NoopMetrics.space4 + NoopMetrics.sourceBadgeHeight / 2)
+                            .allowsHitTesting(false)
                     }
                 }
         }
@@ -1749,10 +1762,17 @@ struct LiquidTodayView: View {
         // gravity ⇒ no sleep_performance point ever written) used to pin Rest to the weeks-old series tail
         // forever while Charge advanced; freshness-gate the tail-fallback so a stale tail falls through to
         // the Rest hero's No-Data/calibrating state (same empty treatment Effort uses) instead of freezing.
-        restScore = TodayView.freshRestScore(
-            todayValue: restByDay[selectedDayKey], lastDay: restSeries.last?.day,
-            lastValue: restSeries.last?.value, isTodaySelected: selectedDayOffset == 0,
-            todayKey: selectedDayKey)
+        // Plus the day's NSDR credit, through the same resolver the classic Today uses: only on the day's
+        // own Rest, never on a carried night.
+        restNSDRCredit = TodayView.nsdrCreditForDisplayedRest(
+            isOwnDay: restByDay[selectedDayKey] != nil,
+            dayCredit: await repo.nsdrRestCredit(day: selectedDayKey))
+        restScore = AnalyticsEngine.Rest.withRestorativeCredit(
+            TodayView.freshRestScore(
+                todayValue: restByDay[selectedDayKey], lastDay: restSeries.last?.day,
+                lastValue: restSeries.last?.value, isTodaySelected: selectedDayOffset == 0,
+                todayKey: selectedDayKey),
+            creditPoints: restNSDRCredit)
         // StressModel loops the full history to build its baseline — run it OFF the main actor so a big
         // history doesn't stutter the UI. Snapshot the inputs (value types) into the detached task.
         let storedStress = await stressA
