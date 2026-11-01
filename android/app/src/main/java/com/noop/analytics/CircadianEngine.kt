@@ -361,11 +361,12 @@ object CircadianEngine {
      * compares PHASE alone, whereas "when should I sleep tonight" has to budget a full night, so it uses
      * the same need the sleep-debt ledger measures against.
      *
-     * null for a non-positive or impossible need, on the same reasoning as [idealSleepWindow].
-     * Mirrors the Swift twin exactly.
+     * null for a non-positive, impossible or NaN need, on the same reasoning as [idealSleepWindow].
+     * Mirrors the Swift twin exactly: the guard is written as the Swift `guard needHours > 0, needHours < 24`
+     * negated, because every comparison with NaN is false and `<= 0 || >= 24` would let NaN through.
      */
     fun idealTonight(tempMinHour: Double, needHours: Double): IdealTonight? {
-        if (needHours <= 0.0 || needHours >= 24.0) return null
+        if (!(needHours > 0.0 && needHours < 24.0)) return null
         val wake = wrap24(tempMinHour + cbtMinBeforeWakeHours)
         return IdealTonight(fallAsleepHour = wrap24(wake - needHours), wakeHour = wake)
     }

@@ -359,6 +359,12 @@ class CircadianEngineTest {
         }
     }
 
+    /** A NaN need has no bedtime, as in Swift: every NaN comparison is false, so a naive range check passes it. */
+    @Test
+    fun idealTonightRejectsNaNNeed() {
+        assertNull(CircadianEngine.idealTonight(4.5, Double.NaN))
+    }
+
     /**
      * Tonight's wake shares the dial's ideal-arc wake anchor, but the bedtime budgets the NEED rather than
      * last night's length — [CircadianEngine.idealSleepWindow] must keep using the duration it is given.

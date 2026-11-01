@@ -281,6 +281,11 @@ final class CircadianEngineTests: XCTestCase {
         }
     }
 
+    /// A NaN need has no bedtime. Same check as the Kotlin twin, which once let NaN through its range guard.
+    func testIdealTonightRejectsNaNNeed() {
+        XCTAssertNil(CircadianEngine.idealTonight(tempMinHour: 4.5, needHours: .nan))
+    }
+
     /// Tonight's wake shares the dial's ideal-arc wake anchor, but the bedtime budgets the NEED rather than
     /// last night's length — `idealSleepWindow` must keep using the duration it is given.
     func testIdealTonightUsesNeedWhileIdealWindowKeepsDuration() {
