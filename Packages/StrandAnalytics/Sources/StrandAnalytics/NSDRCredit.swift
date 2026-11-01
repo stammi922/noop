@@ -16,11 +16,11 @@ import Foundation
 /// efficiency, stages, sleep need or sleep debt. A day without NSDR scores exactly as before.
 ///
 /// The numbers, all on the Rest 0–100 scale:
-/// - A session earns full credit (`perSessionPoints`, 2.0) once the user listened to at least
+/// - A session earns full credit (`perSessionPoints`, 2.0) once the player advanced through at least
 ///   `fullCreditFraction` (80 %) of the recording's nominal length. NSDR scripts are short and the
 ///   benefit comes from completing the protocol, so 8 of 10 minutes is "done".
 /// - Below `zeroCreditBelowFraction` (50 %) a session earns 0: half a script is not the protocol.
-/// - Between 50 % and 80 % the credit ramps LINEARLY from 0 to full (65 % listened earns half). A ramp
+/// - Between 50 % and 80 % the credit ramps LINEARLY from 0 to full (65 % played earns half). A ramp
 ///   rather than a step, so there is no cliff at either edge and an extra minute always counts a little.
 /// - Only the `maxSessionsPerDay` (2) best sessions of a day count; a third session adds 0.
 /// - The day's total is capped at `dailyCapPoints` (4.0). For scale: in `AnalyticsEngine.Rest` the
@@ -40,7 +40,7 @@ public enum NSDRCredit {
 
     /// One finished session, reduced to what the credit needs.
     public struct Session: Equatable, Sendable {
-        /// Seconds actually played (from the player's clock, never wall time while paused).
+        /// Seconds of the recording the player advanced while playing (its own clock, never wall time).
         public let listenedSeconds: Double
         /// Full length of the recording that was playing.
         public let nominalSeconds: Double

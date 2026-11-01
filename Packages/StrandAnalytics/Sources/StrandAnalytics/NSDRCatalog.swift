@@ -68,10 +68,12 @@ public enum NSDRCatalog {
     }
 }
 
-/// Counts how long the user actually LISTENED, from the player's own playback clock rather than wall
-/// time: a paused, buffering or stopped player adds nothing, and a seek (a jump in the playback position)
-/// adds nothing either, so scrubbing to the end can't claim a full session. Fed one observation per
-/// player tick. Pure.
+/// Counts the seconds of the recording the player advanced while PLAYING, from its own playback clock
+/// rather than wall time. It cannot tell whether anyone was listening, only that the recording ran: a
+/// paused, buffering or stopped player adds nothing, and a seek (a jump in the playback position) adds
+/// nothing either, so scrubbing to the end can't claim a full session. Replaying a stretch counts again;
+/// `NSDRCredit` caps the credited share at 1.0 of the nominal length. Fed one observation per player
+/// tick. Pure.
 public struct NSDRListenTracker: Equatable, Sendable {
     /// The largest forward step between two ticks still counted as listening (seconds). Ticks arrive
     /// about once a second; anything larger is a seek, not playback.
