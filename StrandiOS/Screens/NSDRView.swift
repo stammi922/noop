@@ -38,6 +38,8 @@ final class NSDRPlayerModel: ObservableObject {
     /// Bumped for every new recording so the web view reloads; `autoplay` says whether it should start.
     @Published private(set) var loadToken = 0
     private(set) var autoplay = false
+    /// Bumped to ask the web view to pause (an ended session must not keep playing into a new one).
+    @Published private(set) var pauseToken = 0
 
     private var tracker = NSDRListenTracker()
     private var sessionStart: Date?
@@ -102,6 +104,9 @@ final class NSDRPlayerModel: ObservableObject {
         return FinishedSession(recording: recording, startedAt: start, endedAt: Date(),
                                listenedSeconds: tracker.listenedSeconds, nominalSeconds: nominalSeconds)
     }
+
+    /// Pause playback (End session), so the next session starts only when the user presses play.
+    func pause() { pauseToken += 1 }
 
     /// Switch to a different recording (never the current one) and start it.
     func next() {
@@ -186,6 +191,7 @@ struct NSDRView: View {
                         player.next()
                     }
                     NoopButton("End session", systemImage: "stop.fill", kind: .primary, fullWidth: true) {
+                        player.pause()
                         endSession()
                     }
                     .disabled(player.listenedSeconds <= 0)
@@ -315,7 +321,9 @@ struct NSDRView: View {
             let row = await Self.log(done, repo: repo)
             if let row {
                 let points = NSDRCredit.sessionPoints(.init(listenedSeconds: row.listenedS, nominalSeconds: row.nominalS))
-                lastResult = String(localized: "Logged \(Self.clock(row.listenedS)) of NSDR · +\(Self.points(points)) Rest")
+                let logged = String(localized: "Logged \(Self.clock(row.listenedS)) of NSDR")
+                let credit = points > 0 ? String(localized: "+\(Self.points(points)) Rest") : String(localized: "No credit")
+                lastResult = "\(logged) · \(credit)"
             } else {
                 lastResult = String(localized: "Not logged: sessions under 30 seconds aren't saved.")
             }
@@ -391,7 +399,12 @@ private struct NSDRYouTubePlayer: UIViewRepresentable {
 
     func updateUIView(_ web: WKWebView, context: Context) {
         context.coordinator.model = model
-        if context.coordinator.loadedToken != model.loadToken { context.coordinator.load(into: web) }
+        if context.coordinator.loadedToken != model.loadToken {
+            context.coordinator.load(into: web)
+        } else if context.coordinator.pausedToken != model.pauseToken {
+            context.coordinator.pausedToken = model.pauseToken
+            web.evaluateJavaScript("if (player && player.pauseVideo) { player.pauseVideo(); }")
+        }
     }
 
     static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
@@ -403,11 +416,13 @@ private struct NSDRYouTubePlayer: UIViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler {
         var model: NSDRPlayerModel
         var loadedToken = -1
+        var pausedToken = 0
 
         init(model: NSDRPlayerModel) { self.model = model }
 
         func load(into web: WKWebView) {
             loadedToken = model.loadToken
+            pausedToken = model.pauseToken
             let origin = NSDRYouTubePlayer.embedOrigin
             web.loadHTMLString(NSDRYouTubePlayer.html(videoId: model.recording.id, origin: origin.absoluteString,
                                                       autoplay: model.autoplay),
