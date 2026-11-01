@@ -127,6 +127,7 @@ struct NSDRView: View {
     @EnvironmentObject private var repo: Repository
     @StateObject private var player = NSDRPlayerModel()
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var history: [NSDRSessionRow] = []
     /// The note under the controls after a session is ended ("Logged …" / "Too short to log").
@@ -141,14 +142,24 @@ struct NSDRView: View {
             historyCard
         }
         .task { await reloadHistory() }
-        // A recording that plays to the end finishes the session by itself.
         .onChange(of: player.state) { _, state in
+            // NSDR is done with eyes closed, so auto-lock would cut it short: hold the screen on while
+            // the recording plays, and let go as soon as it pauses, ends or fails.
+            ScreenIdle.keepAwake(state == .playing || state == .buffering)
+            // A recording that plays to the end finishes the session by itself.
             if state == .ended { endSession() }
         }
-        .onAppear {
-            ScreenIdle.keepAwake(true)
-            NSDRAudioSession.activate()
+        // Going to the background (Home, the lock button, a call) ends the session as End does: the
+        // app has no background audio mode, because YouTube's terms forbid background playback of
+        // embeds, so iOS stops the player there anyway. The clock resets, so coming back can't log
+        // the same time twice.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .background else { return }
+            player.pause()
+            ScreenIdle.keepAwake(false)
+            endSession()
         }
+        .onAppear { NSDRAudioSession.activate() }
         .onDisappear {
             ScreenIdle.keepAwake(false)
             NSDRAudioSession.deactivate()
@@ -192,6 +203,7 @@ struct NSDRView: View {
                     }
                     NoopButton("End session", systemImage: "stop.fill", kind: .primary, fullWidth: true) {
                         player.pause()
+                        ScreenIdle.keepAwake(false)
                         endSession()
                     }
                     .disabled(player.listenedSeconds <= 0)
@@ -331,11 +343,25 @@ struct NSDRView: View {
         }
     }
 
+    /// Writes the session under a background-task assertion, so a session ended by going to the
+    /// background is stored before iOS suspends the app.
     @discardableResult
     private static func log(_ done: NSDRPlayerModel.FinishedSession, repo: Repository) async -> NSDRSessionRow? {
-        await repo.logNSDRSession(startedAt: done.startedAt, endedAt: done.endedAt,
-                                  recordingId: done.recording.id,
-                                  listenedSeconds: done.listenedSeconds, nominalSeconds: done.nominalSeconds)
+        let application = UIApplication.shared
+        var taskID: UIBackgroundTaskIdentifier = .invalid
+        taskID = application.beginBackgroundTask(withName: "nsdr-log-session") {
+            application.endBackgroundTask(taskID)
+            taskID = .invalid
+        }
+        defer {
+            if taskID != .invalid {
+                application.endBackgroundTask(taskID)
+                taskID = .invalid
+            }
+        }
+        return await repo.logNSDRSession(startedAt: done.startedAt, endedAt: done.endedAt,
+                                         recordingId: done.recording.id,
+                                         listenedSeconds: done.listenedSeconds, nominalSeconds: done.nominalSeconds)
     }
 
     private func reloadHistory() async {
