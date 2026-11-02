@@ -344,4 +344,62 @@ final class CircadianEngineTests: XCTestCase {
         XCTAssertEqual(scheduleAligned.offsetVsScheduleMinutes, 0)
         XCTAssertGreaterThan(abs(windowOffset), 1.0)
     }
+
+    // MARK: - Tonight plan
+
+    /// The plan's seven times, as the card prints them. Same helper as the Kotlin twin.
+    private func planClocks(_ p: CircadianEngine.TonightPlan) -> [String] {
+        [p.tempMinHour, p.morningLightStartHour, p.morningLightEndHour, p.firstCaffeineHour,
+         p.lastCaffeineEarliestHour, p.lastCaffeineLatestHour, p.dimLightsHour]
+            .map(CircadianEngine.clockToFiveMinutes)
+    }
+
+    /// T 04:30, need 8 h → W 07:00, F 23:00. Same vector as the Kotlin twin.
+    func testTonightPlanForATypicalClock() {
+        let plan = CircadianEngine.tonightPlan(tempMinHour: 4.5, needHours: 8)!
+        XCTAssertEqual(planClocks(plan), ["04:30", "07:30", "08:00", "08:30", "13:00", "15:00", "21:00"])
+    }
+
+    /// T 23:00, need 8 h → W 01:30, F 17:30: every time wraps into the day, none negative or 24:xx.
+    func testTonightPlanWrapsRoundMidnight() {
+        let plan = CircadianEngine.tonightPlan(tempMinHour: 23, needHours: 8)!
+        XCTAssertEqual(planClocks(plan), ["23:00", "02:00", "02:30", "03:00", "07:30", "09:30", "15:30"])
+        for h in [plan.tempMinHour, plan.morningLightStartHour, plan.morningLightEndHour, plan.firstCaffeineHour,
+                  plan.lastCaffeineEarliestHour, plan.lastCaffeineLatestHour, plan.dimLightsHour] {
+            XCTAssertGreaterThanOrEqual(h, 0)
+            XCTAssertLessThan(h, 24)
+        }
+    }
+
+    /// The plan hangs off `idealTonight`'s W and F, and is nil exactly when that is.
+    func testTonightPlanIsNilExactlyWhenIdealTonightIs() {
+        func est(_ c: CircadianEngine.PhaseConfidence) -> CircadianEngine.PhaseEstimate {
+            CircadianEngine.PhaseEstimate(tempMinHour: 4.5, acrophaseHours: 16.5, offsetVsScheduleMinutes: 0,
+                                          confidence: c, note: "")
+        }
+        XCTAssertNil(CircadianEngine.tonightPlan(est(.unreadable), needHours: 8))
+        XCTAssertNotNil(CircadianEngine.tonightPlan(est(.wide), needHours: 8))
+        XCTAssertNotNil(CircadianEngine.tonightPlan(est(.solid), needHours: 8))
+        for need in [0.0, -1, 24, .nan] {
+            XCTAssertNil(CircadianEngine.tonightPlan(est(.solid), needHours: need), "need \(need)")
+        }
+        let plan = CircadianEngine.tonightPlan(est(.solid), needHours: 9)!
+        let tonight = CircadianEngine.idealTonight(est(.solid), needHours: 9)!
+        XCTAssertEqual(plan.morningLightStartHour, tonight.wakeHour + 0.5, accuracy: 1e-12)
+        XCTAssertEqual(plan.dimLightsHour, tonight.fallAsleepHour - 2, accuracy: 1e-12)
+    }
+
+    /// Mean absolute deviation from the circular mean, rounded to five minutes. Same vectors as Kotlin.
+    func testWakeSpreadMinutes() {
+        func h(_ hh: Double, _ mm: Double) -> Double { hh + mm / 60 }
+        let week = [h(6, 30), h(7, 0), h(7, 30), h(7, 0), h(6, 45), h(7, 15), h(7, 0)]
+        XCTAssertEqual(CircadianEngine.wakeSpreadMinutes(wakeHours: week), 15)
+        // Round midnight: twenty minutes apart, so ±10 — not the ±12 h an arithmetic mean would give.
+        let midnight = [h(23, 50), h(0, 10), h(23, 50), h(0, 10)]
+        XCTAssertEqual(CircadianEngine.wakeSpreadMinutes(wakeHours: midnight), 10)
+        XCTAssertNil(CircadianEngine.wakeSpreadMinutes(wakeHours: [h(7, 0), h(7, 30), h(6, 30)]))
+        XCTAssertEqual(CircadianEngine.wakeSpreadMinutes(wakeHours: [7, 7, 7, 7]), 0)
+        // Wakes that cancel out round the clock have no mean to measure from.
+        XCTAssertNil(CircadianEngine.wakeSpreadMinutes(wakeHours: [0, 6, 12, 18]))
+    }
 }

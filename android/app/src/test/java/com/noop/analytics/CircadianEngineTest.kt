@@ -420,4 +420,64 @@ class CircadianEngineTest {
         assertEquals("schedule-relative reads aligned", 0.0, scheduleAligned.offsetVsScheduleMinutes, 0.0)
         assertTrue("while the clock-relative read is hours away", kotlin.math.abs(windowOffset) > 1.0)
     }
+
+    // ── Tonight plan ──
+
+    /** The plan's seven times, as the card prints them. Same helper as the Swift twin. */
+    private fun planClocks(p: CircadianEngine.TonightPlan): List<String> =
+        listOf(
+            p.tempMinHour, p.morningLightStartHour, p.morningLightEndHour, p.firstCaffeineHour,
+            p.lastCaffeineEarliestHour, p.lastCaffeineLatestHour, p.dimLightsHour,
+        ).map(CircadianEngine::clockToFiveMinutes)
+
+    /** T 04:30, need 8 h → W 07:00, F 23:00. Same vector as the Swift twin. */
+    @Test
+    fun tonightPlanForATypicalClock() {
+        val plan = CircadianEngine.tonightPlan(4.5, 8.0)!!
+        assertEquals(listOf("04:30", "07:30", "08:00", "08:30", "13:00", "15:00", "21:00"), planClocks(plan))
+    }
+
+    /** T 23:00, need 8 h → W 01:30, F 17:30: every time wraps into the day, none negative or 24:xx. */
+    @Test
+    fun tonightPlanWrapsRoundMidnight() {
+        val plan = CircadianEngine.tonightPlan(23.0, 8.0)!!
+        assertEquals(listOf("23:00", "02:00", "02:30", "03:00", "07:30", "09:30", "15:30"), planClocks(plan))
+        for (h in listOf(plan.tempMinHour, plan.morningLightStartHour, plan.morningLightEndHour,
+            plan.firstCaffeineHour, plan.lastCaffeineEarliestHour, plan.lastCaffeineLatestHour, plan.dimLightsHour)) {
+            assertTrue("hour $h in [0, 24)", h >= 0.0 && h < 24.0)
+        }
+    }
+
+    /** The plan hangs off [CircadianEngine.idealTonight]'s W and F, and is null exactly when that is. */
+    @Test
+    fun tonightPlanIsNullExactlyWhenIdealTonightIs() {
+        fun est(c: CircadianEngine.PhaseConfidence) = CircadianEngine.PhaseEstimate(
+            tempMinHour = 4.5, acrophaseHours = 16.5, offsetVsScheduleMinutes = 0.0, confidence = c, note = "",
+        )
+        assertNull(CircadianEngine.tonightPlan(est(CircadianEngine.PhaseConfidence.UNREADABLE), 8.0))
+        assertTrue(CircadianEngine.tonightPlan(est(CircadianEngine.PhaseConfidence.WIDE), 8.0) != null)
+        assertTrue(CircadianEngine.tonightPlan(est(CircadianEngine.PhaseConfidence.SOLID), 8.0) != null)
+        for (need in listOf(0.0, -1.0, 24.0, Double.NaN)) {
+            assertNull("need $need", CircadianEngine.tonightPlan(est(CircadianEngine.PhaseConfidence.SOLID), need))
+        }
+        val plan = CircadianEngine.tonightPlan(est(CircadianEngine.PhaseConfidence.SOLID), 9.0)!!
+        val tonight = CircadianEngine.idealTonight(est(CircadianEngine.PhaseConfidence.SOLID), 9.0)!!
+        assertEquals(tonight.wakeHour + 0.5, plan.morningLightStartHour, 1e-12)
+        assertEquals(tonight.fallAsleepHour - 2.0, plan.dimLightsHour, 1e-12)
+    }
+
+    /** Mean absolute deviation from the circular mean, rounded to five minutes. Same vectors as Swift. */
+    @Test
+    fun wakeSpreadMinutes() {
+        fun h(hh: Int, mm: Int) = hh + mm / 60.0
+        val week = listOf(h(6, 30), h(7, 0), h(7, 30), h(7, 0), h(6, 45), h(7, 15), h(7, 0))
+        assertEquals(15, CircadianEngine.wakeSpreadMinutes(week))
+        // Round midnight: twenty minutes apart, so ±10 — not the ±12 h an arithmetic mean would give.
+        val midnight = listOf(h(23, 50), h(0, 10), h(23, 50), h(0, 10))
+        assertEquals(10, CircadianEngine.wakeSpreadMinutes(midnight))
+        assertNull(CircadianEngine.wakeSpreadMinutes(listOf(h(7, 0), h(7, 30), h(6, 30))))
+        assertEquals(0, CircadianEngine.wakeSpreadMinutes(listOf(7.0, 7.0, 7.0, 7.0)))
+        // Wakes that cancel out round the clock have no mean to measure from.
+        assertNull(CircadianEngine.wakeSpreadMinutes(listOf(0.0, 6.0, 12.0, 18.0)))
+    }
 }

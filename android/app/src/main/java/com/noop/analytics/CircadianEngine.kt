@@ -78,6 +78,27 @@ object CircadianEngine {
      * three buckets coarse enough to be honest about that. Mirrors the Swift twin exactly.
      */
     const val chronotypeBandHours: Double = 1.0
+    /**
+     * Tonight-plan offsets, in hours from tonight's ideal WAKE (W) or FALL-ASLEEP (F) time.
+     *
+     * Behavioural timing only — light, caffeine and lamp habits, never a supplement or drug. Morning
+     * light half an hour to an hour after waking is the advancing side of the light PRC; a first coffee
+     * ~90 min after waking is the common "let the morning cortisol rise run first" habit; caffeine's
+     * ~5 h half-life is why the last cup is a RANGE 8-10 h before sleep rather than one cut-off; dim
+     * lamps for the last two hours protect the body clock's own evening wind-down. Population rules of
+     * thumb, so the card words them as "aim for", never as a prescription. Mirrors the Swift twin exactly.
+     */
+    const val morningLightStartAfterWakeHours: Double = 0.5
+    const val morningLightEndAfterWakeHours: Double = 1.0
+    const val firstCaffeineAfterWakeHours: Double = 1.5
+    const val lastCaffeineEarliestBeforeSleepHours: Double = 10.0
+    const val lastCaffeineLatestBeforeSleepHours: Double = 8.0
+    const val dimLightsBeforeSleepHours: Double = 2.0
+    /**
+     * Fewest main-sleep wakes a spread is reported from. Three points have a mean, but one odd morning
+     * then moves the spread by a third; four is the smallest week that reads as a habit.
+     */
+    const val minWakesForSpread: Int = 4
 
     // ── Inputs ──
 
@@ -382,6 +403,87 @@ object CircadianEngine {
     fun idealTonight(estimate: PhaseEstimate, needHours: Double): IdealTonight? {
         if (estimate.confidence == PhaseConfidence.UNREADABLE) return null
         return idealTonight(estimate.tempMinHour, needHours)
+    }
+
+    /**
+     * The Tonight plan: when to seek light, when to have caffeine, when to dim the lamps — every time a
+     * clock hour in [0, 24), derived from tonight's ideal wake (W) and fall-asleep (F). Twin of Swift
+     * `CircadianEngine.TonightPlan`.
+     *
+     * [morningLightStartHour] / [morningLightEndHour]: W + [morningLightStartAfterWakeHours] to W +
+     * [morningLightEndAfterWakeHours]. [firstCaffeineHour]: no earlier than W + [firstCaffeineAfterWakeHours].
+     * [lastCaffeineEarliestHour] / [lastCaffeineLatestHour]: last coffee by somewhere in F −
+     * [lastCaffeineEarliestBeforeSleepHours] … F − [lastCaffeineLatestBeforeSleepHours]; a range, because
+     * caffeine sensitivity varies too much between people for one cut-off to be honest. [dimLightsHour]:
+     * F − [dimLightsBeforeSleepHours]. [tempMinHour] is the estimated body-temperature low the plan hangs off.
+     */
+    data class TonightPlan(
+        val tempMinHour: Double,
+        val morningLightStartHour: Double,
+        val morningLightEndHour: Double,
+        val firstCaffeineHour: Double,
+        val lastCaffeineEarliestHour: Double,
+        val lastCaffeineLatestHour: Double,
+        val dimLightsHour: Double,
+    )
+
+    /**
+     * Tonight's plan for a temperature minimum and a sleep need, anchored on [idealTonight]'s W and F.
+     *
+     * Built FROM [idealTonight], never from its own copy of the arithmetic, so the plan and the "Tonight,
+     * aim for" line above it cannot disagree about W or F. Every time is wrapped into [0, 24): a 23:00
+     * temperature minimum puts W at 01:30 and F at 17:30, and the last-coffee range then sits at
+     * 07:30-09:30 the same morning rather than at a negative hour. null exactly when [idealTonight] is.
+     * Mirrors the Swift twin exactly.
+     */
+    fun tonightPlan(tempMinHour: Double, needHours: Double): TonightPlan? {
+        val tonight = idealTonight(tempMinHour, needHours) ?: return null
+        val w = tonight.wakeHour
+        val f = tonight.fallAsleepHour
+        return TonightPlan(
+            tempMinHour = wrap24(tempMinHour),
+            morningLightStartHour = wrap24(w + morningLightStartAfterWakeHours),
+            morningLightEndHour = wrap24(w + morningLightEndAfterWakeHours),
+            firstCaffeineHour = wrap24(w + firstCaffeineAfterWakeHours),
+            lastCaffeineEarliestHour = wrap24(f - lastCaffeineEarliestBeforeSleepHours),
+            lastCaffeineLatestHour = wrap24(f - lastCaffeineLatestBeforeSleepHours),
+            dimLightsHour = wrap24(f - dimLightsBeforeSleepHours),
+        )
+    }
+
+    /**
+     * The plan for a phase estimate, or null exactly when [idealTonight] for that estimate is — so an
+     * UNREADABLE fit gets neither the Tonight line nor the plan, never one without the other.
+     * Mirrors the Swift twin exactly.
+     */
+    fun tonightPlan(estimate: PhaseEstimate, needHours: Double): TonightPlan? {
+        if (idealTonight(estimate, needHours) == null) return null
+        return tonightPlan(estimate.tempMinHour, needHours)
+    }
+
+    /**
+     * How far main-sleep wake times stray from their usual time: the mean absolute deviation, in minutes
+     * rounded to five, of [wakeHours] from their CIRCULAR mean.
+     *
+     * Circular because wake times live on a clock. Wakes at 23:50 and 00:10 are twenty minutes apart, and
+     * an arithmetic mean of 23.83 and 0.17 lands at noon and reports a twelve-hour spread. The mean is the
+     * direction of the summed unit vectors; each deviation is the shortest signed distance to it.
+     *
+     * Pass main-sleep wakes only — a nap's wake is not a habit to be consistent about. null with fewer than
+     * [minWakesForSpread] wakes, or when the wakes cancel out round the clock and no mean exists.
+     * Mirrors the Swift twin exactly.
+     */
+    fun wakeSpreadMinutes(wakeHours: List<Double>): Int? {
+        if (wakeHours.size < minWakesForSpread) return null
+        val w = 2.0 * PI / 24.0
+        val n = wakeHours.size.toDouble()
+        var sumX = 0.0
+        var sumY = 0.0
+        for (h in wakeHours) { sumX += cos(w * h); sumY += sin(w * h) }
+        if (!(sqrt(sumX * sumX + sumY * sumY) / n > 1e-9)) return null
+        val mean = wrap24(atan2(sumY, sumX) / w)
+        val deviation = wakeHours.sumOf { abs(signedHourDelta(mean, wrap24(it))) } / n
+        return (deviation * 60.0 / 5.0).roundToInt() * 5
     }
 
     /**
