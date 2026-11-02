@@ -217,6 +217,9 @@ struct SleepModel {
     /// Recency-weighted sleep-debt estimate across the latest 14 usable nights, with
     /// raw per-night deltas for context. Computed once per data change.
     let sleepDebtLedger: SleepDebtLedger
+
+    /// Main-night wake timestamps of the newest seven wake days, newest first (`recentMainWakeTs`).
+    let recentMainWakeTs: [Int]
 }
 
 /// Explicit inputs for `SleepModel.build(_:)` — a snapshot of the repository state the builder reads.
@@ -348,6 +351,17 @@ extension SleepModel {
             result[day] = SleepView.napSleepMinutes(blocks, habitualMidsleepSec: habitualMidsleepSec)
         }
         return result
+    }
+
+    /// The newest `limit` days' MAIN-night wake timestamps, newest first — one per wake day, through the
+    /// same bridged `mainNightSpan` selector the hero uses, so a nap's wake never counts and a briefly
+    /// interrupted night counts once. A day of naps only has no main span and drops out. Feeds the Body
+    /// clock card's wake-time spread; the caller cuts the trailing-week window against the live clock.
+    static func recentMainWakeTs(navDays: [[CachedSleepSession]], habitualMidsleepSec: Int?,
+                                 limit: Int = 7) -> [Int] {
+        Array(navDays.lazy
+            .compactMap { SleepView.mainNightSpan($0, habitualMidsleepSec: habitualMidsleepSec)?.end }
+            .prefix(limit))
     }
 
     // MARK: Typical / need
@@ -583,6 +597,7 @@ extension SleepModel {
             typicalRemMin: typicalStageMin(days: inputs.days, \.remMin),
             typicalLightMin: typicalStageMin(days: inputs.days, \.lightMin),
             trendPoints: durationTrendPoints(days: inputs.days),
-            sleepDebtLedger: debtLedger(days: inputs.days, napSleepMinByDay: napSleepMinByDay))
+            sleepDebtLedger: debtLedger(days: inputs.days, napSleepMinByDay: napSleepMinByDay),
+            recentMainWakeTs: recentMainWakeTs(navDays: dayGroups, habitualMidsleepSec: habitual))
     }
 }

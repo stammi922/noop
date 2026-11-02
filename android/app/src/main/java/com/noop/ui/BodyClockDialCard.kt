@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import com.noop.R
@@ -56,8 +59,9 @@ import kotlin.math.sin
  * The dial card. [actualBedHour] / [actualWakeHour] are the night's own clock hours (0..<24, fractional),
  * taken from the scored session by the caller. [needHours] is the sleep need tonight's fall-asleep time
  * budgets — the SAME need the sleep-debt ledger measures against, so the two cards never disagree about
- * what a full night is. null while that need is not known yet; the card then omits the Tonight line.
- * Twin of Apple `BodyClockDialCard`.
+ * what a full night is. null while that need is not known yet; the card then omits the Tonight line and
+ * the Tonight plan. [recentWakeHours] are the local clock hours of the MAIN-sleep wakes in the last seven
+ * days (naps excluded), for the plan's wake-time spread. Twin of Apple `BodyClockDialCard`.
  */
 @Composable
 fun BodyClockDialCard(
@@ -65,6 +69,7 @@ fun BodyClockDialCard(
     actualBedHour: Double,
     actualWakeHour: Double,
     needHours: Double?,
+    recentWakeHours: List<Double> = emptyList(),
 ) {
     // One hue for both arcs, told apart by dash and weight rather than by a second colour. Two blues
     // competed with the background image; a single legible one plus a dashed, lighter reference does not.
@@ -255,6 +260,8 @@ fun BodyClockDialCard(
             }
 
             tonightFor(estimate, needHours)?.let { TonightLine(it) }
+            // null under exactly the conditions the Tonight line above is, including the need still loading.
+            tonightPlanFor(estimate, needHours)?.let { TonightPlanList(it, recentWakeHours) }
         }
     }
 }
@@ -327,6 +334,66 @@ private fun TonightLine(tonight: CircadianEngine.IdealTonight) {
             color = Palette.textPrimary,
         )
     }
+}
+
+/**
+ * What the Tonight plan shows, or null for no plan — the same need gate as [tonightFor], so the plan never
+ * renders from a fallback need before the personal one has loaded, and never without the Tonight line.
+ */
+internal fun tonightPlanFor(estimate: CircadianEngine.PhaseEstimate, needHours: Double?): CircadianEngine.TonightPlan? =
+    needHours?.let { CircadianEngine.tonightPlan(estimate, it) }
+
+/**
+ * The Tonight plan: what to do around tonight's times, as a compact secondary list under the Tonight line.
+ * Light, caffeine and lamp timing only — the engine never suggests a supplement or drug. Each row wraps
+ * rather than truncating, so a narrow phone or a large font scale grows the card instead of clipping a
+ * time. The wake-time spread is the one item with its own data requirement, and it is the only one that
+ * drops out when there is too little of it. Twin of Apple `tonightPlanList`.
+ */
+@Composable
+private fun TonightPlanList(plan: CircadianEngine.TonightPlan, recentWakeHours: List<Double>) {
+    val t = CircadianEngine::clockToFiveMinutes
+    val spread = CircadianEngine.wakeSpreadMinutes(recentWakeHours)
+    Column(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            uiString(R.string.l10n_body_clock_dial_card_tonight_plan_6f5a5dcc),
+            style = NoopType.footnote,
+            color = Palette.textTertiary,
+        )
+        PlanRow(uiString(R.string.l10n_body_clock_dial_card_body_temp_low_1_s_2ac3a1b4, t(plan.tempMinHour)))
+        PlanRow(
+            uiString(R.string.l10n_body_clock_dial_card_morning_sunlight_1_s_2_s_f3a8628a,
+                t(plan.morningLightStartHour), t(plan.morningLightEndHour)),
+            hint = uiString(R.string.l10n_body_clock_dial_card_10_min_if_clear_20_min_ab618f92),
+        )
+        PlanRow(uiString(R.string.l10n_body_clock_dial_card_first_coffee_after_1_s_75a4ab80, t(plan.firstCaffeineHour)))
+        PlanRow(
+            uiString(R.string.l10n_body_clock_dial_card_last_coffee_by_1_s_2_97f16136,
+                t(plan.lastCaffeineEarliestHour), t(plan.lastCaffeineLatestHour)),
+        )
+        PlanRow(uiString(R.string.l10n_body_clock_dial_card_dim_lights_from_1_s_4981bfaa, t(plan.dimLightsHour)))
+        spread?.let {
+            PlanRow(
+                uiString(R.string.l10n_body_clock_dial_card_wake_time_spread_last_7_days_c864a613, it),
+                hint = uiString(R.string.l10n_body_clock_dial_card_aim_for_within_1_h_bd621024),
+            )
+        }
+    }
+}
+
+/** One plan item, its optional hint in the quieter tint. Twin of Apple `planRow`. */
+@Composable
+private fun PlanRow(text: String, hint: String? = null) {
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(color = Palette.textSecondary)) { append(text) }
+            if (hint != null) withStyle(SpanStyle(color = Palette.textTertiary)) { append(" · $hint") }
+        },
+        style = NoopType.footnote,
+    )
 }
 
 /** A unix second as a fractional LOCAL clock hour — the dial's only input beyond the phase estimate. */

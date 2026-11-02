@@ -2752,6 +2752,15 @@
     <string name="l10n_body_clock_dial_card_your_clock_1b91f5ee">Your clock</string>
     <string name="l10n_body_clock_dial_card_tonight_aim_for_e3575c2a">Tonight, aim for</string>
     <string name="l10n_body_clock_dial_card_wake_1_s_fall_asleep_2_889bc5ab">Wake %1$s · Fall asleep %2$s</string>
+    <string name="l10n_body_clock_dial_card_tonight_plan_6f5a5dcc">Tonight plan</string>
+    <string name="l10n_body_clock_dial_card_body_temp_low_1_s_2ac3a1b4">Body temp low ≈ %1$s</string>
+    <string name="l10n_body_clock_dial_card_morning_sunlight_1_s_2_s_f3a8628a">Morning sunlight %1$s–%2$s</string>
+    <string name="l10n_body_clock_dial_card_10_min_if_clear_20_min_ab618f92">~10 min if clear, ~20 min if cloudy</string>
+    <string name="l10n_body_clock_dial_card_first_coffee_after_1_s_75a4ab80">First coffee after %1$s</string>
+    <string name="l10n_body_clock_dial_card_last_coffee_by_1_s_2_97f16136">Last coffee by %1$s–%2$s</string>
+    <string name="l10n_body_clock_dial_card_dim_lights_from_1_s_4981bfaa">Dim lights from %1$s</string>
+    <string name="l10n_body_clock_dial_card_wake_time_spread_last_7_days_c864a613">Wake-time spread, last 7 days: ±%1$d min</string>
+    <string name="l10n_body_clock_dial_card_aim_for_within_1_h_bd621024">aim for within ±1 h</string>
     <string name="vo2max_method_change_caption">The line breaks where the estimation method changed or was not recorded.</string>
     <string name="l10n_app_changelog_a_whoop_5_that_stays_connected_7b490eee">A WHOOP 5 that stays connected, your body clock on the Sleep screen, and a Journal that knows No from nothing</string>
     <string name="l10n_app_changelog_choose_a_12_hour_clock_sleep_8a19db5c">Choose a 12-hour clock, sleep from straps that bank no motion, and a strap log that stops guessing</string>

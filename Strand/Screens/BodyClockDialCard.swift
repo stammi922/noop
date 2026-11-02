@@ -24,6 +24,9 @@ struct BodyClockDialCard: View {
     /// The sleep need tonight's fall-asleep time budgets, in hours — the SAME need the sleep-debt ledger
     /// measures against, so the two cards never disagree about what a full night is.
     let needHours: Double
+    /// Local clock hours of the MAIN-sleep wakes in the last seven days (naps excluded), for the Tonight
+    /// plan's wake-time spread. Fewer than `CircadianEngine.minWakesForSpread` hides only that one item.
+    var recentWakeHours: [Double] = []
 
     // One hue for both arcs, told apart by dash and weight rather than by a second colour. Two blues
     // competed with the background image; a single legible one plus a dashed, lighter reference does not.
@@ -71,6 +74,10 @@ struct BodyClockDialCard: View {
                     }
                     if let tonight = CircadianEngine.idealTonight(estimate, needHours: needHours) {
                         tonightLine(tonight)
+                    }
+                    // nil under exactly the conditions the Tonight line above is, by construction.
+                    if let plan = CircadianEngine.tonightPlan(estimate, needHours: needHours) {
+                        tonightPlanList(plan)
                     }
                 }
             }
@@ -339,6 +346,40 @@ struct BodyClockDialCard: View {
                 .foregroundStyle(StrandPalette.textPrimary)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// The Tonight plan: what to do around tonight's times, as a compact secondary list under the Tonight
+    /// line. Light, caffeine and lamp timing only — the engine never suggests a supplement or drug.
+    /// Each row wraps rather than truncating, so a narrow phone or a large text size grows the card
+    /// instead of clipping a time. The wake-time spread is the one item with its own data requirement,
+    /// and it is the only one that drops out when there is too little of it.
+    private func tonightPlanList(_ plan: CircadianEngine.TonightPlan) -> some View {
+        let t = CircadianEngine.clockToFiveMinutes
+        let spread = CircadianEngine.wakeSpreadMinutes(wakeHours: recentWakeHours)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("Tonight plan")
+                .font(StrandFont.footnote)
+                .foregroundStyle(StrandPalette.textTertiary)
+            planRow(String(localized: "Body temp low ≈ \(t(plan.tempMinHour))"))
+            planRow(String(localized: "Morning sunlight \(t(plan.morningLightStartHour))–\(t(plan.morningLightEndHour))"),
+                    hint: String(localized: "~10 min if clear, ~20 min if cloudy"))
+            planRow(String(localized: "First coffee after \(t(plan.firstCaffeineHour))"))
+            planRow(String(localized: "Last coffee by \(t(plan.lastCaffeineEarliestHour))–\(t(plan.lastCaffeineLatestHour))"))
+            planRow(String(localized: "Dim lights from \(t(plan.dimLightsHour))"))
+            if let spread {
+                planRow(String(localized: "Wake-time spread, last 7 days: ±\(spread) min"),
+                        hint: String(localized: "aim for within ±1 h"))
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// One plan item, its optional hint in the quieter tint. Both arrive already localized, hence verbatim.
+    private func planRow(_ text: String, hint: String? = nil) -> some View {
+        (Text(verbatim: text).foregroundColor(StrandPalette.textSecondary)
+            + Text(verbatim: hint.map { " · \($0)" } ?? "").foregroundColor(StrandPalette.textTertiary))
+            .font(StrandFont.footnote)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func chronotypeText(_ c: CircadianEngine.Chronotype) -> String {

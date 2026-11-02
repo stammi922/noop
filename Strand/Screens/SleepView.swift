@@ -498,9 +498,14 @@ struct SleepView: View {
         // rather than read via an `appModel: AppModel` property on this screen — see the NOTE above.
         // Tonight's need is the ledger's own (`debtNeedMin`), so the dial's suggested bedtime and the
         // sleep-debt card agree on what a full night is.
+        // The spread window is cut HERE, against the clock, rather than inside the memoized model: the
+        // model only rebuilds on a data change, and a week-old list must not keep reading as "last 7 days".
+        let weekAgo = Int(Date().timeIntervalSince1970) - 7 * 86_400
         BodyClockDialSection(actualBedHour: Self.localClockHour(model.night.session.effectiveStartTs),
                               actualWakeHour: Self.localClockHour(model.night.session.endTs),
-                              needHours: model.sleepDebtLedger.needMin / 60.0)
+                              needHours: model.sleepDebtLedger.needMin / 60.0,
+                              recentWakeHours: model.recentMainWakeTs.filter { $0 >= weekAgo }
+                                  .map(Self.localClockHour))
     }
 
     /// A unix second as a fractional local clock hour — the dial's only input beyond the phase estimate.

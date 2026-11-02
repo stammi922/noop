@@ -14,13 +14,15 @@ struct BodyClockDialSection: View {
     let actualBedHour: Double
     let actualWakeHour: Double
     let needHours: Double
+    /// Main-sleep wake clock hours from the last seven days, for the Tonight plan's wake-time spread.
+    var recentWakeHours: [Double] = []
 
     /// Drawn only for a fit that is at least `.wide`: an `.unreadable` rhythm has no phase to compare a
     /// night against, and an empty ring would read as a broken chart rather than as "not enough data".
     var body: some View {
         if let phase = appModel.circadianPhase, phase.confidence != .unreadable {
             BodyClockDialCard(estimate: phase, actualBedHour: actualBedHour, actualWakeHour: actualWakeHour,
-                              needHours: needHours)
+                              needHours: needHours, recentWakeHours: recentWakeHours)
         }
     }
 }
