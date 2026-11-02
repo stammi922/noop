@@ -37,8 +37,8 @@ final class CircadianEngineTests: XCTestCase {
         let bins = profile(mesor: 50, amp: 30, acrophase: 15)
         let est = CircadianEngine.estimatePhase(bins: bins, daysObserved: 20, habitualWakeHour: 7)!
         XCTAssertEqual(est.confidence, .solid)
-        // Acrophase 15:00 → derived temp-min ≈ 15 − 12 = 03:00.
-        XCTAssertEqual(est.tempMinHour, 3, accuracy: 1e-6)
+        // Acrophase 15:00 → derived temp-min ≈ 15 − acrophaseAfterCbtMinHours (10) = 05:00.
+        XCTAssertEqual(est.tempMinHour, 5, accuracy: 1e-6)
     }
 
     func testThinDataIsWideOrUnreadable() {
@@ -401,5 +401,85 @@ final class CircadianEngineTests: XCTestCase {
         XCTAssertEqual(CircadianEngine.wakeSpreadMinutes(wakeHours: [7, 7, 7, 7]), 0)
         // Wakes that cancel out round the clock have no mean to measure from.
         XCTAssertNil(CircadianEngine.wakeSpreadMinutes(wakeHours: [0, 6, 12, 18]))
+    }
+
+    // MARK: - The HR-derived phase lands where a real sleeper's clock is
+
+    /// A deterministic, realistic 14-day HEART-RATE profile for someone asleep from `sleepStartHour` for
+    /// about eight hours, pooled exactly as `AppModel.computeCircadianPhase` pools the real one: per-minute
+    /// HR, hourly means labelled by the hour they START (`hrBuckets` groups on `(ts / 3600) * 3600`), then
+    /// each clock hour's mean across the days. Mirrored verbatim in the Kotlin twin.
+    ///
+    /// The HR model is deliberately ordinary: 56 bpm asleep and 74 awake, a 3 bpm circadian swing whose
+    /// low sits 2.5 h before wake (the CBTmin rule the engine itself uses), a morning bump, lunch, three
+    /// evening workouts a week, a quieter last 90 minutes, ±30 min of bedtime jitter and ±3 bpm noise.
+    private func pooledHRProfile(sleepStartHour: Double, days: Int = 14) -> [CircadianEngine.ActivityBin] {
+        var seed = 7
+        func uniform() -> Double {
+            seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648
+            return Double(seed) / 2_147_483_648
+        }
+        var sums = [Double](repeating: 0, count: 24)
+        for day in 0..<days {
+            let onset = sleepStartHour + (uniform() - 0.5)
+            let wake = onset + 8 + (uniform() - 0.5) * 0.5
+            let workout = [1, 3, 5].contains(day % 7)
+            var hourSum = [Double](repeating: 0, count: 24)
+            for minute in 0..<(24 * 60) {
+                let t = Double(minute) / 60
+                let asleep = CircadianEngine.wrap24(t - onset) < wake - onset
+                let sinceWake = CircadianEngine.wrap24(t - wake)
+                var hr = asleep ? 56.0 : 74.0
+                hr += 3 * cos(2 * Double.pi * (t - (wake - 2.5 + 12)) / 24)
+                if !asleep {
+                    if sinceWake < 1.5 { hr += 10 }
+                    if sinceWake >= 5.5 && sinceWake < 6.25 { hr += 6 }
+                    if workout && sinceWake >= 10.5 && sinceWake < 11.5 { hr += 12 }
+                    if CircadianEngine.wrap24(onset - t) < 1.5 { hr -= 4 }
+                }
+                hr += (uniform() - 0.5) * 6
+                hourSum[minute / 60] += hr
+            }
+            for h in 0..<24 { sums[h] += hourSum[h] / 60 }
+        }
+        return (0..<24).map { CircadianEngine.ActivityBin(hour: Double($0), activity: sums[$0] / Double(days)) }
+    }
+
+    /// Tonight's W and F for a pooled HR profile, at an 8 h need, as the card prints them.
+    private func tonightClocks(sleepStartHour: Double, wakeHour: Double) -> (t: String, w: String, f: String) {
+        let est = CircadianEngine.estimatePhase(bins: pooledHRProfile(sleepStartHour: sleepStartHour),
+                                                daysObserved: 14, habitualWakeHour: wakeHour)!
+        let tonight = CircadianEngine.idealTonight(est, needHours: 8)!
+        print("HR profile \(CircadianEngine.clockToFiveMinutes(sleepStartHour)) sleeper: acrophase "
+              + "\(CircadianEngine.clockToFiveMinutes(est.acrophaseHours)), T "
+              + "\(CircadianEngine.clockToFiveMinutes(est.tempMinHour)), W "
+              + "\(CircadianEngine.clockToFiveMinutes(tonight.wakeHour)), F "
+              + "\(CircadianEngine.clockToFiveMinutes(tonight.fallAsleepHour)) (\(est.confidence))")
+        return (CircadianEngine.clockToFiveMinutes(est.tempMinHour),
+                CircadianEngine.clockToFiveMinutes(tonight.wakeHour),
+                CircadianEngine.clockToFiveMinutes(tonight.fallAsleepHour))
+    }
+
+    /// Minutes between two "HH:MM" clock strings, the short way round.
+    private func minutesApart(_ a: String, _ b: String) -> Int {
+        func m(_ s: String) -> Int { Int(s.prefix(2))! * 60 + Int(s.suffix(2))! }
+        let d = abs(m(a) - m(b)) % (24 * 60)
+        return min(d, 24 * 60 - d)
+    }
+
+    /// Under the old 12 h offset this sleeper was told to wake at 04:45 and fall asleep at 20:45.
+    func testHRProfileTonightForA2300To0700Sleeper() {
+        let c = tonightClocks(sleepStartHour: 23, wakeHour: 7)
+        XCTAssertLessThanOrEqual(minutesApart(c.w, "07:00"), 30, "wake \(c.w)")
+        XCTAssertLessThanOrEqual(minutesApart(c.f, "23:00"), 30, "fall asleep \(c.f)")
+        XCTAssertEqual([c.t, c.w, c.f], ["04:15", "06:45", "22:45"])
+    }
+
+    /// Under the old 12 h offset: 06:45 / 22:45. The offset is a constant, so it moves with the schedule.
+    func testHRProfileTonightForA0100To0900Sleeper() {
+        let c = tonightClocks(sleepStartHour: 1, wakeHour: 9)
+        XCTAssertLessThanOrEqual(minutesApart(c.w, "09:00"), 30, "wake \(c.w)")
+        XCTAssertLessThanOrEqual(minutesApart(c.f, "01:00"), 30, "fall asleep \(c.f)")
+        XCTAssertEqual([c.t, c.w, c.f], ["06:15", "08:45", "00:45"])
     }
 }

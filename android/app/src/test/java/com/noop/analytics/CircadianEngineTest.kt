@@ -38,7 +38,8 @@ class CircadianEngineTest {
     @Test fun strongRhythmEnoughDaysIsSolid() {
         val est = CircadianEngine.estimatePhase(profile(50.0, 30.0, 15.0), 20, 7.0)!!
         assertEquals(CircadianEngine.PhaseConfidence.SOLID, est.confidence)
-        assertEquals(3.0, est.tempMinHour, 1e-6)
+        // Acrophase 15:00 → derived temp-min ≈ 15 − acrophaseAfterCbtMinHours (10) = 05:00.
+        assertEquals(5.0, est.tempMinHour, 1e-6)
     }
 
     @Test fun thinDataIsUnreadable() {
@@ -479,5 +480,85 @@ class CircadianEngineTest {
         assertEquals(0, CircadianEngine.wakeSpreadMinutes(listOf(7.0, 7.0, 7.0, 7.0)))
         // Wakes that cancel out round the clock have no mean to measure from.
         assertNull(CircadianEngine.wakeSpreadMinutes(listOf(0.0, 6.0, 12.0, 18.0)))
+    }
+
+    // ── The HR-derived phase lands where a real sleeper's clock is ──
+
+    /**
+     * A deterministic, realistic 14-day HEART-RATE profile for someone asleep from [sleepStartHour] for
+     * about eight hours, pooled exactly as the production caller pools the real one: per-minute HR, hourly
+     * means labelled by the hour they START (the HR buckets group on `(ts / 3600) * 3600`), then each clock
+     * hour's mean across the days. Mirrors the Swift twin verbatim.
+     *
+     * The HR model is deliberately ordinary: 56 bpm asleep and 74 awake, a 3 bpm circadian swing whose low
+     * sits 2.5 h before wake (the CBTmin rule the engine itself uses), a morning bump, lunch, three evening
+     * workouts a week, a quieter last 90 minutes, ±30 min of bedtime jitter and ±3 bpm noise.
+     */
+    private fun pooledHRProfile(sleepStartHour: Double, days: Int = 14): List<CircadianEngine.ActivityBin> {
+        var seed = 7L
+        fun uniform(): Double {
+            seed = (seed * 1_103_515_245L + 12_345L) % 2_147_483_648L
+            return seed.toDouble() / 2_147_483_648.0
+        }
+        val sums = DoubleArray(24)
+        for (day in 0 until days) {
+            val onset = sleepStartHour + (uniform() - 0.5)
+            val wake = onset + 8.0 + (uniform() - 0.5) * 0.5
+            val workout = (day % 7) in listOf(1, 3, 5)
+            val hourSum = DoubleArray(24)
+            for (minute in 0 until 24 * 60) {
+                val t = minute / 60.0
+                val asleep = CircadianEngine.wrap24(t - onset) < wake - onset
+                val sinceWake = CircadianEngine.wrap24(t - wake)
+                var hr = if (asleep) 56.0 else 74.0
+                hr += 3.0 * cos(2.0 * PI * (t - (wake - 2.5 + 12.0)) / 24.0)
+                if (!asleep) {
+                    if (sinceWake < 1.5) hr += 10.0
+                    if (sinceWake >= 5.5 && sinceWake < 6.25) hr += 6.0
+                    if (workout && sinceWake >= 10.5 && sinceWake < 11.5) hr += 12.0
+                    if (CircadianEngine.wrap24(onset - t) < 1.5) hr -= 4.0
+                }
+                hr += (uniform() - 0.5) * 6.0
+                hourSum[minute / 60] += hr
+            }
+            for (h in 0 until 24) sums[h] += hourSum[h] / 60.0
+        }
+        return (0 until 24).map { CircadianEngine.ActivityBin(it.toDouble(), sums[it] / days) }
+    }
+
+    /** Tonight's T, W and F for a pooled HR profile, at an 8 h need, as the card prints them. */
+    private fun tonightClocks(sleepStartHour: Double, wakeHour: Double): List<String> {
+        val est = CircadianEngine.estimatePhase(pooledHRProfile(sleepStartHour), 14, wakeHour)!!
+        val tonight = CircadianEngine.idealTonight(est, 8.0)!!
+        val c = listOf(est.tempMinHour, tonight.wakeHour, tonight.fallAsleepHour)
+            .map(CircadianEngine::clockToFiveMinutes)
+        println("HR profile ${CircadianEngine.clockToFiveMinutes(sleepStartHour)} sleeper: acrophase " +
+            "${CircadianEngine.clockToFiveMinutes(est.acrophaseHours)}, T ${c[0]}, W ${c[1]}, F ${c[2]} (${est.confidence})")
+        return c
+    }
+
+    /** Minutes between two "HH:MM" clock strings, the short way round. */
+    private fun minutesApart(a: String, b: String): Int {
+        fun m(s: String) = s.take(2).toInt() * 60 + s.takeLast(2).toInt()
+        val d = kotlin.math.abs(m(a) - m(b)) % (24 * 60)
+        return minOf(d, 24 * 60 - d)
+    }
+
+    /** Under the old 12 h offset this sleeper was told to wake at 04:45 and fall asleep at 20:45. */
+    @Test
+    fun hrProfileTonightForA2300To0700Sleeper() {
+        val (t, w, f) = tonightClocks(23.0, 7.0)
+        assertTrue("wake $w", minutesApart(w, "07:00") <= 30)
+        assertTrue("fall asleep $f", minutesApart(f, "23:00") <= 30)
+        assertEquals(listOf("04:15", "06:45", "22:45"), listOf(t, w, f))
+    }
+
+    /** Under the old 12 h offset: 06:45 / 22:45. The offset is a constant, so it moves with the schedule. */
+    @Test
+    fun hrProfileTonightForA0100To0900Sleeper() {
+        val (t, w, f) = tonightClocks(1.0, 9.0)
+        assertTrue("wake $w", minutesApart(w, "09:00") <= 30)
+        assertTrue("fall asleep $f", minutesApart(f, "01:00") <= 30)
+        assertEquals(listOf("06:15", "08:45", "00:45"), listOf(t, w, f))
     }
 }
