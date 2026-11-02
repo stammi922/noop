@@ -2623,6 +2623,15 @@
     <string name="l10n_body_clock_dial_card_your_clock_1b91f5ee">你的生物钟</string>
     <string name="l10n_body_clock_dial_card_tonight_aim_for_e3575c2a">今晚目标</string>
     <string name="l10n_body_clock_dial_card_wake_1_s_fall_asleep_2_889bc5ab">起床 %1$s · 入睡 %2$s</string>
+    <string name="l10n_body_clock_dial_card_tonight_plan_6f5a5dcc">今晚计划</string>
+    <string name="l10n_body_clock_dial_card_body_temp_low_1_s_2ac3a1b4">体温低点 ≈ %1$s</string>
+    <string name="l10n_body_clock_dial_card_morning_sunlight_1_s_2_s_f3a8628a">晨间日照 %1$s–%2$s</string>
+    <string name="l10n_body_clock_dial_card_10_min_if_clear_20_min_ab618f92">晴天约 10 分钟，阴天约 20 分钟</string>
+    <string name="l10n_body_clock_dial_card_first_coffee_after_1_s_75a4ab80">%1$s 之后再喝第一杯咖啡</string>
+    <string name="l10n_body_clock_dial_card_last_coffee_by_1_s_2_97f16136">最后一杯咖啡在 %1$s–%2$s 之前</string>
+    <string name="l10n_body_clock_dial_card_dim_lights_from_1_s_4981bfaa">%1$s 起调暗灯光</string>
+    <string name="l10n_body_clock_dial_card_wake_time_spread_last_7_days_c864a613">近 7 天起床时间波动：±%1$d 分钟</string>
+    <string name="l10n_body_clock_dial_card_aim_for_within_1_h_bd621024">尽量控制在 ±1 小时内</string>
     <string name="vo2max_method_change_caption">线条在估算方法发生变化或未记录之处中断。</string>
     <string name="l10n_app_changelog_a_whoop_5_that_stays_connected_7b490eee">不再频繁掉线的 WHOOP 5、睡眠页上的生物钟，以及能分清「否」与「未记录」的日志</string>
     <string name="l10n_app_changelog_choose_a_12_hour_clock_sleep_8a19db5c">自选 12 小时制、从无运动数据的手环读取睡眠，以及不再靠猜测的手环日志</string>

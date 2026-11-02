@@ -46,7 +46,7 @@ public enum CircadianEngine {
     /// The relative test scales the requirement WITH resting HR, so the identical swing is accepted on one
     /// body and refused on another: 5.5 bpm passes at a 55 bpm mesor and fails at 74.7. That is not a
     /// judgement about the rhythm, it is a judgement about the baseline, and a measured wearer sat exactly
-    /// there — 5.5 bpm on a 74.7 bpm mesor, acrophase 16.1 h implying a CBTmin near 04:06, which is a
+    /// there — 5.5 bpm on a 74.7 bpm mesor, acrophase 16.1 h, a coherent afternoon peak, which is a
     /// textbook phase rather than noise. `minRelativeAmplitude`'s own note called for precisely that
     /// observation ("a wearer whose amplitude is disproportionately small for their mesor") before the
     /// shape could be revisited.
@@ -63,7 +63,17 @@ public enum CircadianEngine {
     public static let cbtMinBeforeWakeHours: Double = 2.5
     /// Activity acrophase (peak activity) sits roughly this many hours after CBTmin in a typical day — the
     /// offset used to convert the cosinor acrophase into an estimated temperature-minimum time.
-    public static let acrophaseAfterCbtMinHours: Double = 12.0
+    ///
+    /// 10 h, not the 12 h ("half a day") this started as. The signal is pooled mean HEART RATE (see
+    /// `ActivityBin`), and its cosinor peak is not the mirror image of CBTmin: it is the centre of mass
+    /// of the WAKING day, pulled earlier by the morning rise, about seven hours after wake. A
+    /// 23:00-07:00 sleeper peaks near 14:15, so 12 h put CBTmin at 02:15, wake at 04:45 and a suggested
+    /// bedtime of 20:45, where the real CBTmin sits ~05:00. The pipeline adds half an hour of its own:
+    /// `hrBuckets` labels each hourly mean by the hour it STARTS, so every bin reads 30 min early. 10 h
+    /// absorbs both and lands that sleeper at 04:15 / 06:45 / 22:45; a 01:00-09:00 sleeper moves with it.
+    /// `CircadianEngineTests` pins both on a realistic pooled HR profile. Still a population constant:
+    /// it moves every wearer's estimate by the same amount and personalises nothing.
+    public static let acrophaseAfterCbtMinHours: Double = 10.0
     /// Population-typical wake hour, used ONLY to place the chronotype reference point.
     ///
     /// `offsetVsScheduleMinutes` compares the clock to the USER'S OWN schedule, so it cannot name a
@@ -73,11 +83,28 @@ public enum CircadianEngine {
     public static let chronotypeReferenceWakeHour: Double = 7.0
     /// Half-width of the "intermediate" band around the reference CBTmin, in hours.
     ///
-    /// Deliberately wide. `tempMinHour` is derived from an activity cosinor (`acrophase - 12 h`) unless a
+    /// Deliberately wide. `tempMinHour` is derived from an activity cosinor (`acrophase - 10 h`) unless a
     /// measured `observedTempMinHour` is supplied, and NO production caller supplies one today — so this
     /// is a lean inferred from movement, not a thermal measurement. A one-hour band either side keeps the
     /// three buckets coarse enough to be honest about that.
     public static let chronotypeBandHours: Double = 1.0
+    /// Tonight-plan offsets, in hours from tonight's ideal WAKE (W) or FALL-ASLEEP (F) time.
+    ///
+    /// Behavioural timing only — light, caffeine and lamp habits, never a supplement or drug. Morning
+    /// light half an hour to an hour after waking is the advancing side of the light PRC; a first coffee
+    /// ~90 min after waking is the common "let the morning cortisol rise run first" habit; caffeine's
+    /// ~5 h half-life is why the last cup is a RANGE 8-10 h before sleep rather than one cut-off; dim
+    /// lamps for the last two hours protect the body clock's own evening wind-down. Population rules of
+    /// thumb, so the card words them as "aim for", never as a prescription.
+    public static let morningLightStartAfterWakeHours: Double = 0.5
+    public static let morningLightEndAfterWakeHours: Double = 1.0
+    public static let firstCaffeineAfterWakeHours: Double = 1.5
+    public static let lastCaffeineEarliestBeforeSleepHours: Double = 10.0
+    public static let lastCaffeineLatestBeforeSleepHours: Double = 8.0
+    public static let dimLightsBeforeSleepHours: Double = 2.0
+    /// Fewest main-sleep wakes a spread is reported from. Three points have a mean, but one odd morning
+    /// then moves the spread by a third; four is the smallest week that reads as a habit.
+    public static let minWakesForSpread: Int = 4
 
     // MARK: - Inputs
 
@@ -221,7 +248,8 @@ public enum CircadianEngine {
                                  note: "Your rhythm is hard to read right now - keep wearing it for a clearer picture.")
         }
 
-        // Activity-derived temp-minimum ≈ acrophase − ~12 h (activity peaks roughly half a day after CBTmin).
+        // Activity-derived temp-minimum ≈ acrophase − `acrophaseAfterCbtMinHours` (see that constant for why
+        // the HR peak sits about ten hours, not half a day, after CBTmin).
         let derivedTempMin = wrap24(fit.acrophaseHours - acrophaseAfterCbtMinHours)
         let tempMinHour = observedTempMinHour ?? derivedTempMin
 
@@ -431,6 +459,81 @@ public enum CircadianEngine {
                                     needHours: Double) -> (fallAsleepHour: Double, wakeHour: Double)? {
         guard estimate.confidence != .unreadable else { return nil }
         return idealTonight(tempMinHour: estimate.tempMinHour, needHours: needHours)
+    }
+
+    /// The Tonight plan: when to seek light, when to have caffeine, when to dim the lamps — every time a
+    /// clock hour in [0, 24), derived from tonight's ideal wake (W) and fall-asleep (F).
+    public struct TonightPlan: Equatable, Sendable {
+        /// The estimated body-temperature low the whole plan hangs off (the estimate's `tempMinHour`).
+        public let tempMinHour: Double
+        /// Morning light window: W + `morningLightStartAfterWakeHours` to W + `morningLightEndAfterWakeHours`.
+        public let morningLightStartHour: Double
+        public let morningLightEndHour: Double
+        /// First coffee no earlier than W + `firstCaffeineAfterWakeHours`.
+        public let firstCaffeineHour: Double
+        /// Last coffee by somewhere in F − `lastCaffeineEarliestBeforeSleepHours` … F −
+        /// `lastCaffeineLatestBeforeSleepHours`. A range, because caffeine sensitivity varies too much
+        /// between people for one cut-off to be honest.
+        public let lastCaffeineEarliestHour: Double
+        public let lastCaffeineLatestHour: Double
+        /// Dim the lights from F − `dimLightsBeforeSleepHours`.
+        public let dimLightsHour: Double
+        public init(tempMinHour: Double, morningLightStartHour: Double, morningLightEndHour: Double,
+                    firstCaffeineHour: Double, lastCaffeineEarliestHour: Double, lastCaffeineLatestHour: Double,
+                    dimLightsHour: Double) {
+            self.tempMinHour = tempMinHour
+            self.morningLightStartHour = morningLightStartHour; self.morningLightEndHour = morningLightEndHour
+            self.firstCaffeineHour = firstCaffeineHour
+            self.lastCaffeineEarliestHour = lastCaffeineEarliestHour
+            self.lastCaffeineLatestHour = lastCaffeineLatestHour
+            self.dimLightsHour = dimLightsHour
+        }
+    }
+
+    /// Tonight's plan for a temperature minimum and a sleep need, anchored on `idealTonight`'s W and F.
+    ///
+    /// Built FROM `idealTonight`, never from its own copy of the arithmetic, so the plan and the "Tonight,
+    /// aim for" line above it cannot disagree about W or F. Every time is wrapped into [0, 24): a 23:00
+    /// temperature minimum puts W at 01:30 and F at 17:30, and the last-coffee range then sits at
+    /// 07:30-09:30 the same morning rather than at a negative hour. nil exactly when `idealTonight` is.
+    public static func tonightPlan(tempMinHour: Double, needHours: Double) -> TonightPlan? {
+        guard let tonight = idealTonight(tempMinHour: tempMinHour, needHours: needHours) else { return nil }
+        let w = tonight.wakeHour, f = tonight.fallAsleepHour
+        return TonightPlan(tempMinHour: wrap24(tempMinHour),
+                           morningLightStartHour: wrap24(w + morningLightStartAfterWakeHours),
+                           morningLightEndHour: wrap24(w + morningLightEndAfterWakeHours),
+                           firstCaffeineHour: wrap24(w + firstCaffeineAfterWakeHours),
+                           lastCaffeineEarliestHour: wrap24(f - lastCaffeineEarliestBeforeSleepHours),
+                           lastCaffeineLatestHour: wrap24(f - lastCaffeineLatestBeforeSleepHours),
+                           dimLightsHour: wrap24(f - dimLightsBeforeSleepHours))
+    }
+
+    /// The plan for a phase estimate, or nil exactly when `idealTonight(_:needHours:)` is — so an
+    /// `.unreadable` fit gets neither the Tonight line nor the plan, never one without the other.
+    public static func tonightPlan(_ estimate: PhaseEstimate, needHours: Double) -> TonightPlan? {
+        guard idealTonight(estimate, needHours: needHours) != nil else { return nil }
+        return tonightPlan(tempMinHour: estimate.tempMinHour, needHours: needHours)
+    }
+
+    /// How far main-sleep wake times stray from their usual time: the mean absolute deviation, in
+    /// minutes rounded to five, of `wakeHours` from their CIRCULAR mean.
+    ///
+    /// Circular because wake times live on a clock. Wakes at 23:50 and 00:10 are twenty minutes apart,
+    /// and an arithmetic mean of 23.83 and 0.17 lands at noon and reports a twelve-hour spread. The mean
+    /// is the direction of the summed unit vectors; each deviation is the shortest signed distance to it.
+    ///
+    /// Pass main-sleep wakes only — a nap's wake is not a habit to be consistent about. nil with fewer
+    /// than `minWakesForSpread` wakes, or when the wakes cancel out round the clock and no mean exists.
+    public static func wakeSpreadMinutes(wakeHours: [Double]) -> Int? {
+        guard wakeHours.count >= minWakesForSpread else { return nil }
+        let w = 2.0 * Double.pi / 24.0
+        let n = Double(wakeHours.count)
+        var sumX = 0.0, sumY = 0.0
+        for h in wakeHours { sumX += cos(w * h); sumY += sin(w * h) }
+        guard (sumX * sumX + sumY * sumY).squareRoot() / n > 1e-9 else { return nil }
+        let mean = wrap24(atan2(sumY, sumX) / w)
+        let deviation = wakeHours.reduce(0.0) { $0 + abs(signedHourDelta(from: mean, to: wrap24($1))) } / n
+        return Int((deviation * 60.0 / 5.0).rounded()) * 5
     }
 
     /// Format a clock hour as "HH:MM" (24 h) rounded to the nearest five minutes.

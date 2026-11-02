@@ -481,6 +481,12 @@ fun SleepScreen(
     val napSleepMinByDay = remember(sleeps, habitualMidsleep) {
         napSleepMinutesByDay(sleeps, habitualMidsleep)
     }
+    // The newest seven wake days' MAIN-night wakes, through the same bridged selector the consistency card
+    // and hero use, so a nap's wake never counts. Feeds the Body clock card's wake-time spread; the trailing
+    // week is cut against the live clock at the call site. Mirrors Swift SleepModel.recentMainWakeTs.
+    val recentMainWakeTs = remember(sleeps, habitualMidsleep) {
+        consistencyNightSpans(sleeps, habitualMidsleep, limit = 7).map { it.second }
+    }
 
     // Tapping a metric tile opens a full-history detail sheet for that one metric. (PR #260)
     val metricSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -932,6 +938,10 @@ fun SleepScreen(
                                         // full-history model is still building: the card then prints no
                                         // Tonight line rather than budgeting a default need (iOS parity).
                                         needHours = tilesModel?.let { it.sleepDebtLedger.needMin / 60.0 },
+                                        recentWakeHours = run {
+                                            val weekAgo = System.currentTimeMillis() / 1000L - 7 * 86_400L
+                                            recentMainWakeTs.filter { it >= weekAgo }.map(::localClockHour)
+                                        },
                                     )
                                 }
                             }

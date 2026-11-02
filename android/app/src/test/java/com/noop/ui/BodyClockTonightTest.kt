@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The Body clock card's Tonight line waits for the personal sleep need.
+ * The Body clock card's Tonight line and Tonight plan wait for the personal sleep need.
  *
  * `SleepScreen` passes `needHours = null` until the full-history model (and with it the sleep-debt ledger)
  * has built. The card must then print no line at all: an 8 h fallback would show a 9 h-need user a
@@ -29,5 +29,28 @@ class BodyClockTonightTest {
         val t = tonightFor(solid, needHours = 9.0)!!
         assertEquals("07:00", CircadianEngine.clockToFiveMinutes(t.wakeHour))
         assertEquals("22:00", CircadianEngine.clockToFiveMinutes(t.fallAsleepHour))
+    }
+
+    /** The Tonight plan waits for the same need: no frame of it is ever computed from an 8 h fallback. */
+    @Test
+    fun noPlanWhileNeedIsLoading() {
+        assertNull(tonightPlanFor(solid, needHours = null))
+    }
+
+    @Test
+    fun planUsesThePersonalNeedOnceLoaded() {
+        val p = tonightPlanFor(solid, needHours = 9.0)!!
+        // W 07:00, F 22:00 at a 9 h need: dim lights two hours before F, last coffee 8-10 h before it.
+        assertEquals("20:00", CircadianEngine.clockToFiveMinutes(p.dimLightsHour))
+        assertEquals("12:00", CircadianEngine.clockToFiveMinutes(p.lastCaffeineEarliestHour))
+        assertEquals("14:00", CircadianEngine.clockToFiveMinutes(p.lastCaffeineLatestHour))
+    }
+
+    /** An unreadable fit shows neither the Tonight line nor the plan, whatever the need. */
+    @Test
+    fun unreadableShowsNeitherLineNorPlan() {
+        val unreadable = solid.copy(confidence = CircadianEngine.PhaseConfidence.UNREADABLE)
+        assertNull(tonightFor(unreadable, needHours = 8.0))
+        assertNull(tonightPlanFor(unreadable, needHours = 8.0))
     }
 }

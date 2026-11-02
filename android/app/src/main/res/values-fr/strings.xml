@@ -2716,6 +2716,15 @@
     <string name="l10n_body_clock_dial_card_your_clock_1b91f5ee">Votre horloge</string>
     <string name="l10n_body_clock_dial_card_tonight_aim_for_e3575c2a">Ce soir, visez</string>
     <string name="l10n_body_clock_dial_card_wake_1_s_fall_asleep_2_889bc5ab">Réveil %1$s · Endormissement %2$s</string>
+    <string name="l10n_body_clock_dial_card_tonight_plan_6f5a5dcc">Plan pour ce soir</string>
+    <string name="l10n_body_clock_dial_card_body_temp_low_1_s_2ac3a1b4">Température corporelle minimale ≈ %1$s</string>
+    <string name="l10n_body_clock_dial_card_morning_sunlight_1_s_2_s_f3a8628a">Soleil du matin %1$s–%2$s</string>
+    <string name="l10n_body_clock_dial_card_10_min_if_clear_20_min_ab618f92">~10 min par temps clair, ~20 min par temps couvert</string>
+    <string name="l10n_body_clock_dial_card_first_coffee_after_1_s_75a4ab80">Premier café après %1$s</string>
+    <string name="l10n_body_clock_dial_card_last_coffee_by_1_s_2_97f16136">Dernier café avant %1$s–%2$s</string>
+    <string name="l10n_body_clock_dial_card_dim_lights_from_1_s_4981bfaa">Lumières tamisées dès %1$s</string>
+    <string name="l10n_body_clock_dial_card_wake_time_spread_last_7_days_c864a613">Écart de l\'heure de réveil, 7 derniers jours : ±%1$d min</string>
+    <string name="l10n_body_clock_dial_card_aim_for_within_1_h_bd621024">visez ±1 h maximum</string>
     <string name="vo2max_method_change_caption">La courbe est interrompue là où la méthode d’estimation a changé ou n’a pas été enregistrée.</string>
     <string name="l10n_app_changelog_a_whoop_5_that_stays_connected_7b490eee">Une WHOOP 5 qui reste connectée, votre horloge interne sur l\'écran Sommeil, et un journal qui distingue Non de rien</string>
     <string name="l10n_app_changelog_choose_a_12_hour_clock_sleep_8a19db5c">Choisissez l\'horloge 12 heures, le sommeil depuis des bracelets sans données de mouvement, et un journal qui cesse de deviner</string>
