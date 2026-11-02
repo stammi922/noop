@@ -496,8 +496,11 @@ struct SleepView: View {
     private func bodyClockDial(_ model: SleepModel) -> some View {
         // PERF: `circadianPhase` lives on `AppModel`, isolated into its own leaf (`BodyClockDialSection`)
         // rather than read via an `appModel: AppModel` property on this screen — see the NOTE above.
+        // Tonight's need is the ledger's own (`debtNeedMin`), so the dial's suggested bedtime and the
+        // sleep-debt card agree on what a full night is.
         BodyClockDialSection(actualBedHour: Self.localClockHour(model.night.session.effectiveStartTs),
-                              actualWakeHour: Self.localClockHour(model.night.session.endTs))
+                              actualWakeHour: Self.localClockHour(model.night.session.endTs),
+                              needHours: model.sleepDebtLedger.needMin / 60.0)
     }
 
     /// A unix second as a fractional local clock hour — the dial's only input beyond the phase estimate.

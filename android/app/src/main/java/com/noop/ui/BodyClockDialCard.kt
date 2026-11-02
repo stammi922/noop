@@ -54,13 +54,17 @@ import kotlin.math.sin
 
 /**
  * The dial card. [actualBedHour] / [actualWakeHour] are the night's own clock hours (0..<24, fractional),
- * taken from the scored session by the caller. Twin of Apple `BodyClockDialCard`.
+ * taken from the scored session by the caller. [needHours] is the sleep need tonight's fall-asleep time
+ * budgets — the SAME need the sleep-debt ledger measures against, so the two cards never disagree about
+ * what a full night is. null while that need is not known yet; the card then omits the Tonight line.
+ * Twin of Apple `BodyClockDialCard`.
  */
 @Composable
 fun BodyClockDialCard(
     estimate: CircadianEngine.PhaseEstimate,
     actualBedHour: Double,
     actualWakeHour: Double,
+    needHours: Double?,
 ) {
     // One hue for both arcs, told apart by dash and weight rather than by a second colour. Two blues
     // competed with the background image; a single legible one plus a dashed, lighter reference does not.
@@ -249,6 +253,8 @@ fun BodyClockDialCard(
             CircadianEngine.chronotype(estimate)?.let { c ->
                 Text(chronotypeText(c), style = NoopType.footnote, color = Palette.textTertiary)
             }
+
+            tonightFor(estimate, needHours)?.let { TonightLine(it) }
         }
     }
 }
@@ -286,6 +292,40 @@ private fun LegendItem(colour: androidx.compose.ui.graphics.Color, dashed: Boole
         }
         Spacer(Modifier.width(5.dp))
         Text(label, style = NoopType.footnote, color = Palette.textTertiary)
+    }
+}
+
+/**
+ * What the Tonight line shows, or null for no line. A missing [needHours] means the personal need has not
+ * loaded yet; guessing one would print a bedtime that is wrong for anyone whose need is not the default.
+ */
+internal fun tonightFor(estimate: CircadianEngine.PhaseEstimate, needHours: Double?): CircadianEngine.IdealTonight? =
+    needHours?.let { CircadianEngine.idealTonight(estimate, it) }
+
+/**
+ * The one place the card prints a clock time: when to wake and fall asleep tonight. Below the existing
+ * reading rather than inside it, so the dial and its caption still say exactly what they said before.
+ * Times are 24 h like the dial's numerals, rounded to five minutes by the engine. Twin of Apple
+ * `tonightLine`.
+ */
+@Composable
+private fun TonightLine(tonight: CircadianEngine.IdealTonight) {
+    val wake = CircadianEngine.clockToFiveMinutes(tonight.wakeHour)
+    val asleep = CircadianEngine.clockToFiveMinutes(tonight.fallAsleepHour)
+    Column(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            uiString(R.string.l10n_body_clock_dial_card_tonight_aim_for_e3575c2a),
+            style = NoopType.footnote,
+            color = Palette.textTertiary,
+        )
+        Text(
+            uiString(R.string.l10n_body_clock_dial_card_wake_1_s_fall_asleep_2_889bc5ab, wake, asleep),
+            style = NoopType.bodyNumber,
+            color = Palette.textPrimary,
+        )
     }
 }
 

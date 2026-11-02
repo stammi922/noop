@@ -405,6 +405,45 @@ public enum CircadianEngine {
         return (bedHour: wrap24(wake - durationHours), wakeHour: wake)
     }
 
+    /// Tonight's suggested wake and fall-asleep clock hours for someone who needs `needHours` of sleep.
+    ///
+    /// Same wake anchor as `idealSleepWindow` — `tempMinHour + cbtMinBeforeWakeHours` — but the bedtime is
+    /// that wake minus the sleep NEED, not minus last night's length. The two answer different questions
+    /// and must stay separate functions: the dial's ideal arc copies the actual night's duration so it
+    /// compares PHASE alone, whereas "when should I sleep tonight" has to budget a full night, so it uses
+    /// the same need the sleep-debt ledger measures against.
+    ///
+    /// nil for a non-positive or impossible need, on the same reasoning as `idealSleepWindow`.
+    public static func idealTonight(tempMinHour: Double,
+                                    needHours: Double) -> (fallAsleepHour: Double, wakeHour: Double)? {
+        guard needHours > 0, needHours < 24 else { return nil }
+        let wake = wrap24(tempMinHour + cbtMinBeforeWakeHours)
+        return (fallAsleepHour: wrap24(wake - needHours), wakeHour: wake)
+    }
+
+    /// Tonight's times for a phase estimate, or nil when the fit cannot place them.
+    ///
+    /// `.unreadable` never gets times: its `tempMinHour` is a placeholder off a fit that failed the
+    /// rhythm or day-count gate, and printing a clock time from it would state a precision the card's
+    /// own "hard to read right now" message denies. `.wide` does get them — unlike a NAMED chronotype, a
+    /// suggested time is the same continuous phase reading the dial already draws.
+    public static func idealTonight(_ estimate: PhaseEstimate,
+                                    needHours: Double) -> (fallAsleepHour: Double, wakeHour: Double)? {
+        guard estimate.confidence != .unreadable else { return nil }
+        return idealTonight(tempMinHour: estimate.tempMinHour, needHours: needHours)
+    }
+
+    /// Format a clock hour as "HH:MM" (24 h) rounded to the nearest five minutes.
+    ///
+    /// Five minutes for the same reason the dial caption rounds: the phase is an activity fit, and a
+    /// to-the-minute time would imply a precision it does not carry. Rounds on the whole-day minute count
+    /// and wraps it, so 23:58 reads 00:00 and never 24:00. Locale-free for cross-platform string parity.
+    public static func clockToFiveMinutes(_ hour: Double) -> String {
+        let fives = Int((wrap24(hour) * 60.0 / 5.0).rounded())
+        let minutes = (fives * 5) % (24 * 60)
+        return String(format: "%02d:%02d", minutes / 60, minutes % 60)
+    }
+
     /// Signed hours the ACTUAL sleep window sits later (+) or earlier (−) than the chronotype-ideal one.
     ///
     /// Deliberately NOT `offsetVsScheduleMinutes`. That field compares the body clock to the wearer's own

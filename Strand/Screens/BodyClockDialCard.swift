@@ -21,6 +21,9 @@ struct BodyClockDialCard: View {
     /// The night's own bed/wake clock hours (0..<24, fractional), from the scored session.
     let actualBedHour: Double
     let actualWakeHour: Double
+    /// The sleep need tonight's fall-asleep time budgets, in hours — the SAME need the sleep-debt ledger
+    /// measures against, so the two cards never disagree about what a full night is.
+    let needHours: Double
 
     // One hue for both arcs, told apart by dash and weight rather than by a second colour. Two blues
     // competed with the background image; a single legible one plus a dashed, lighter reference does not.
@@ -65,6 +68,9 @@ struct BodyClockDialCard: View {
                         Text(chronotypeText(chronotype))
                             .font(StrandFont.footnote)
                             .foregroundStyle(StrandPalette.textTertiary)
+                    }
+                    if let tonight = CircadianEngine.idealTonight(estimate, needHours: needHours) {
+                        tonightLine(tonight)
                     }
                 }
             }
@@ -316,6 +322,23 @@ struct BodyClockDialCard: View {
         return minutes > 0
             ? String(localized: "\(amount) later than your body clock")
             : String(localized: "\(amount) earlier than your body clock")
+    }
+
+    /// The one place the card prints a clock time: when to wake and fall asleep tonight. Below the
+    /// existing reading rather than inside it, so the dial and its caption still say exactly what they
+    /// said before. Times are 24 h like the dial's numerals, rounded to five minutes by the engine.
+    private func tonightLine(_ tonight: (fallAsleepHour: Double, wakeHour: Double)) -> some View {
+        let wake = CircadianEngine.clockToFiveMinutes(tonight.wakeHour)
+        let asleep = CircadianEngine.clockToFiveMinutes(tonight.fallAsleepHour)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("Tonight, aim for")
+                .font(StrandFont.footnote)
+                .foregroundStyle(StrandPalette.textTertiary)
+            Text(String(localized: "Wake \(wake) · Fall asleep \(asleep)"))
+                .font(StrandFont.bodyNumber)
+                .foregroundStyle(StrandPalette.textPrimary)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func chronotypeText(_ c: CircadianEngine.Chronotype) -> String {

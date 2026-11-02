@@ -336,6 +336,74 @@ class CircadianEngineTest {
     }
 
     /**
+     * Tonight's times: wake = CBTmin + 2.5 h, fall asleep = wake − need. The 23:00 row wraps BOTH ends
+     * across midnight. Same vectors as the Swift twin.
+     */
+    @Test
+    fun idealTonight() {
+        val cases: List<Triple<Double, Double, Pair<Double, Double>?>> = listOf(
+            Triple(4.5, 8.0, 23.0 to 7.0),
+            Triple(2.0, 8.0, 20.5 to 4.5),
+            Triple(23.0, 8.0, 17.5 to 1.5),
+            Triple(4.5, 7.5, 23.5 to 7.0),
+            Triple(4.5, 0.0, null), Triple(4.5, -1.0, null), Triple(4.5, 24.0, null),
+        )
+        for ((tempMin, need, expected) in cases) {
+            val t = CircadianEngine.idealTonight(tempMin, need)
+            if (expected != null) {
+                assertEquals("sleep for $tempMin/$need", expected.first, t!!.fallAsleepHour, 1e-12)
+                assertEquals("wake for $tempMin/$need", expected.second, t.wakeHour, 1e-12)
+            } else {
+                assertNull("an impossible need has no bedtime: $need", t)
+            }
+        }
+    }
+
+    /** A NaN need has no bedtime, as in Swift: every NaN comparison is false, so a naive range check passes it. */
+    @Test
+    fun idealTonightRejectsNaNNeed() {
+        assertNull(CircadianEngine.idealTonight(4.5, Double.NaN))
+    }
+
+    /**
+     * Tonight's wake shares the dial's ideal-arc wake anchor, but the bedtime budgets the NEED rather than
+     * last night's length — [CircadianEngine.idealSleepWindow] must keep using the duration it is given.
+     */
+    @Test
+    fun idealTonightUsesNeedWhileIdealWindowKeepsDuration() {
+        val tonight = CircadianEngine.idealTonight(4.5, 8.0)!!
+        val window = CircadianEngine.idealSleepWindow(4.5, 6.0)!!
+        assertEquals(window.wakeHour, tonight.wakeHour, 0.0)
+        assertEquals(1.0, window.bedHour, 1e-12)
+        assertEquals(23.0, tonight.fallAsleepHour, 1e-12)
+    }
+
+    /** An UNREADABLE fit never prints a time; WIDE and SOLID do. */
+    @Test
+    fun idealTonightIsWithheldForUnreadable() {
+        fun est(c: CircadianEngine.PhaseConfidence) = CircadianEngine.PhaseEstimate(
+            tempMinHour = 4.5, acrophaseHours = 16.5, offsetVsScheduleMinutes = 0.0, confidence = c, note = "",
+        )
+        assertNull(CircadianEngine.idealTonight(est(CircadianEngine.PhaseConfidence.UNREADABLE), 8.0))
+        assertEquals(7.0, CircadianEngine.idealTonight(est(CircadianEngine.PhaseConfidence.WIDE), 8.0)!!.wakeHour, 0.0)
+        assertEquals(23.0, CircadianEngine.idealTonight(est(CircadianEngine.PhaseConfidence.SOLID), 8.0)!!.fallAsleepHour, 0.0)
+    }
+
+    /** Five-minute rounding, wrapping at midnight: 23:58 is 00:00, never 24:00. Same table as Swift. */
+    @Test
+    fun clockToFiveMinutes() {
+        val cases = listOf(
+            7.0 to "07:00", 23.0 to "23:00", 1.5 to "01:30", 17.5 to "17:30", 20.5 to "20:30",
+            (23.0 + 58.0 / 60.0) to "00:00", (23.0 + 57.0 / 60.0) to "23:55", (23.0 + 56.0 / 60.0) to "23:55",
+            (7.0 + 2.0 / 60.0) to "07:00", (7.0 + 3.0 / 60.0) to "07:05", (6.0 + 59.0 / 60.0) to "07:00",
+            24.0 to "00:00", -0.5 to "23:30", 0.0 to "00:00",
+        )
+        for ((hour, expected) in cases) {
+            assertEquals("hour $hour", expected, CircadianEngine.clockToFiveMinutes(hour))
+        }
+    }
+
+    /**
      * The dial's caption and the card's existing headline measure DIFFERENT things and must not be
      * conflated: a consistent late sleeper is well-aligned with their own schedule (offset ~0) while
      * sleeping hours away from what their clock wants. Pinned so the two never get merged by a refactor.
